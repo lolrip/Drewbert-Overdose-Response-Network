@@ -10,7 +10,7 @@ interface Alert {
   generalLocation: string;
   preciseLocation: string;
   responderCount: number;
-  createdAt: string; // Changed from timeElapsed to createdAt
+  createdAt: string;
   status: 'active' | 'responded' | 'resolved';
   isCommitted?: boolean;
 }
@@ -36,12 +36,13 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
   console.log('✨ [ResponderDashboard] Re-rendering');
   
   const { user } = useAuth();
-  const { alerts: dbAlerts, userCommitments, loading: alertsLoading, error: alertsError, lastFetchTime, commitToAlert, cancelResponse, endResponse, refetch: refetchAlerts } = useAlerts();
-  const { stats, loading: statsLoading, error: statsError, connectionStatus, refetch: refetchStats } = useRealTimeStats();
+  const { alerts: dbAlerts, userCommitments, loading: alertsLoading, error: alertsError, lastFetchTime, connectionStatus: alertsConnectionStatus, commitToAlert, cancelResponse, endResponse, refetch: refetchAlerts } = useAlerts();
+  const { stats, loading: statsLoading, error: statsError, connectionStatus: statsConnectionStatus, refetch: refetchStats } = useRealTimeStats();
   const [showEndResponseForm, setShowEndResponseForm] = useState<string | null>(null);
   const [showCancelForm, setShowCancelForm] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminLoading, setAdminLoading] = useState(true);
+  const [newDataReceived, setNewDataReceived] = useState(false);
   const [responseDetails, setResponseDetails] = useState<ResponseDetails>({
     ambulanceCalled: false,
     personOkay: false,
@@ -64,11 +65,21 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
       alertsLoading,
       alertsError,
       lastFetchTime: lastFetchTime?.toISOString(),
-      connectionStatus,
+      alertsConnectionStatus,
+      statsConnectionStatus,
       statsLoading,
       statsError
     });
-  }, [dbAlerts, userCommitments, alertsLoading, alertsError, lastFetchTime, connectionStatus, statsLoading, statsError]);
+  }, [dbAlerts, userCommitments, alertsLoading, alertsError, lastFetchTime, alertsConnectionStatus, statsConnectionStatus, statsLoading, statsError]);
+
+  // Visual feedback for new data
+  useEffect(() => {
+    if (lastFetchTime && !alertsLoading) {
+      setNewDataReceived(true);
+      const timer = setTimeout(() => setNewDataReceived(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [lastFetchTime, alertsLoading]);
 
   // Check admin status independently
   useEffect(() => {
@@ -111,7 +122,7 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
         generalLocation: alert.general_location,
         preciseLocation: alert.precise_location,
         responderCount: stats.alertCommitments[alert.id] || alert.responder_count,
-        createdAt: alert.created_at, // Store the creation timestamp
+        createdAt: alert.created_at,
         status: alert.status as 'active' | 'responded' | 'resolved',
         isCommitted: userCommitments[alert.id] || false,
       };
@@ -203,14 +214,32 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
     }
   };
 
+  // Determine overall connection status
+  const overallConnectionStatus = alertsConnectionStatus === 'connected' && statsConnectionStatus === 'connected' 
+    ? 'connected' 
+    : alertsConnectionStatus === 'reconnecting' || statsConnectionStatus === 'reconnecting'
+    ? 'reconnecting'
+    : 'disconnected';
+
   const getConnectionStatusIcon = () => {
-    switch (connectionStatus) {
+    switch (overallConnectionStatus) {
       case 'connected':
         return <Wifi className="w-4 h-4 text-primary-600" />;
       case 'reconnecting':
         return <RefreshCw className="w-4 h-4 text-accent-600 animate-spin" />;
       case 'disconnected':
         return <WifiOff className="w-4 h-4 text-coral-600" />;
+    }
+  };
+
+  const getConnectionStatusText = () => {
+    switch (overallConnectionStatus) {
+      case 'connected':
+        return 'Live';
+      case 'reconnecting':
+        return 'Connecting...';
+      case 'disconnected':
+        return 'Offline';
     }
   };
 
@@ -326,7 +355,7 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50">
       {/* Header */}
-      <header className="bg-white shadow-sm sticky top-0 z-10">
+      <header className={`bg-white shadow-sm sticky top-0 z-10 transition-colors duration-300 ${newDataReceived ? 'bg-primary-50' : ''}`}>
         <div className="px-6 py-4">
           <div className="flex items-center gap-4 mb-4">
             <button
@@ -343,8 +372,7 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
                 <div className="flex items-center gap-2">
                   {getConnectionStatusIcon()}
                   <span className="text-xs text-gray-500 font-manrope">
-                    {connectionStatus === 'connected' ? 'Live' : 
-                     connectionStatus === 'reconnecting' ? 'Connecting...' : 'Offline'}
+                    {getConnectionStatusText()}
                   </span>
                 </div>
               </div>
@@ -392,7 +420,7 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
             </button>
           </div>
 
-          {/* Real-time Stats - Only show loading state initially, prevent flickering */}
+          {/* Real-time Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-primary-50 rounded-lg p-4 text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
@@ -454,7 +482,7 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
             <div>
               <h2 className="text-lg font-bold font-space text-gray-900 mb-4">
                 Current Alerts ({activeAlerts.length})
-                {connectionStatus === 'connected' && (
+                {overallConnectionStatus === 'connected' && (
                   <span className="ml-2 text-sm font-normal text-primary-600">• Live Updates</span>
                 )}
               </h2>

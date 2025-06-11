@@ -41,10 +41,14 @@ export function useAlerts() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastFetchTime, setLastFetchTime] = useState<Date | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'reconnecting' | 'disconnected'>('disconnected');
   
   // Use refs to track subscriptions and prevent memory leaks
   const subscriptionsRef = useRef<any[]>([]);
   const isMountedRef = useRef(true);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const userIdRef = useRef<string | null>(null);
 
   const fetchAlerts = useCallback(async () => {
     if (!isMountedRef.current) {
@@ -60,6 +64,9 @@ export function useAlerts() {
       const { data: { user } } = await supabase.auth.getUser();
       console.log('🔍 [useAlerts] Current user:', user?.id ? `authenticated (${user.id})` : 'anonymous');
       
+      // Store user ID for stable channel names
+      userIdRef.current = user?.id || null;
+
       // For debugging: fetch ALL alerts to see what's in the database
       console.log('🔍 [useAlerts] Fetching ALL alerts for debugging...');
       const { data: allAlerts, error: allAlertsError } = await supabase
@@ -123,6 +130,7 @@ export function useAlerts() {
       setAlerts(data || []);
       setLastFetchTime(fetchStartTime);
       setError(null);
+      setConnectionStatus('connected');
       
       // Fetch user's current commitments
       await fetchUserCommitments();
@@ -130,6 +138,7 @@ export function useAlerts() {
       console.error('❌ [useAlerts] Failed to fetch alerts:', err);
       if (isMountedRef.current) {
         setError(err instanceof Error ? err.message : 'Failed to fetch alerts');
+        setConnectionStatus('disconnected');
       }
     } finally {
       if (isMountedRef.current) {
@@ -137,6 +146,20 @@ export function useAlerts() {
       }
     }
   }, []);
+
+  // Debounced fetch function to prevent race conditions
+  const debouncedFetchAlerts = useCallback(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    
+    debounceTimerRef.current = setTimeout(() => {
+      if (isMountedRef.current) {
+        console.log('🔄 [useAlerts] Debounced fetch triggered');
+        fetchAlerts();
+      }
+    }, 300);
+  }, [fetchAlerts]);
 
   const fetchUserCommitments = useCallback(async () => {
     if (!isMountedRef.current) return;
@@ -175,6 +198,31 @@ export function useAlerts() {
       }
     } catch (err) {
       console.error('❌ [useAlerts] Failed to fetch user commitments:', err);
+    }
+  }, []);
+
+  // Start polling fallback when subscriptions fail
+  const startPollingFallback = useCallback(() => {
+    if (pollingTimerRef.current) {
+      clearInterval(pollingTimerRef.current);
+    }
+
+    console.log('🔄 [useAlerts] Starting polling fallback (10s interval)');
+    pollingTimerRef.current = setInterval(() => {
+      if (isMountedRef.current) {
+        console.log('⏰ [useAlerts] Polling fallback fetch');
+        setConnectionStatus('reconnecting');
+        fetchAlerts();
+      }
+    }, 10000);
+  }, [fetchAlerts]);
+
+  // Stop polling fallback when subscriptions work
+  const stopPollingFallback = useCallback(() => {
+    if (pollingTimerRef.current) {
+      console.log('🛑 [useAlerts] Stopping polling fallback');
+      clearInterval(pollingTimerRef.current);
+      pollingTimerRef.current = null;
     }
   }, []);
 
@@ -233,25 +281,14 @@ export function useAlerts() {
       // Update local state immediately for better UX
       setUserCommitments(prev => ({ ...prev, [alertId]: true }));
 
-      // Force immediate refresh with multiple attempts to ensure we get the updated data
-      console.log('🔄 [useAlerts] Forcing immediate refresh after commit');
-      
-      // Try multiple refreshes with increasing delays to handle timing issues
-      const refreshAttempts = [200, 500, 1000, 2000];
-      for (const delay of refreshAttempts) {
-        setTimeout(() => {
-          if (isMountedRef.current) {
-            console.log(`🔄 [useAlerts] Refresh attempt after ${delay}ms`);
-            fetchAlerts();
-          }
-        }, delay);
-      }
+      // Trigger debounced refresh
+      debouncedFetchAlerts();
 
     } catch (err) {
       console.error('❌ [useAlerts] Failed to commit to alert:', err);
       throw err;
     }
-  }, [fetchAlerts]);
+  }, [debouncedFetchAlerts]);
 
   const cancelResponse = useCallback(async (alertId: string, cancellationReason: CancellationReason) => {
     try {
@@ -285,17 +322,8 @@ export function useAlerts() {
         return updated;
       });
 
-      // Force immediate refresh with multiple attempts
-      console.log('🔄 [useAlerts] Forcing immediate refresh after cancel');
-      const refreshAttempts = [200, 500, 1000, 2000];
-      for (const delay of refreshAttempts) {
-        setTimeout(() => {
-          if (isMountedRef.current) {
-            console.log(`🔄 [useAlerts] Refresh attempt after ${delay}ms`);
-            fetchAlerts();
-          }
-        }, delay);
-      }
+      // Trigger debounced refresh
+      debouncedFetchAlerts();
 
       // Log the cancellation for analytics
       console.log('📊 [useAlerts] Response cancelled:', {
@@ -310,7 +338,7 @@ export function useAlerts() {
       console.error('❌ [useAlerts] Failed to cancel response:', err);
       throw err;
     }
-  }, [fetchAlerts]);
+  }, [debouncedFetchAlerts]);
 
   const endResponse = useCallback(async (alertId: string, details: ResponseDetails) => {
     try {
@@ -351,27 +379,18 @@ export function useAlerts() {
         return updated;
       });
 
-      // Force immediate refresh with multiple attempts
-      console.log('🔄 [useAlerts] Forcing immediate refresh after end response');
-      const refreshAttempts = [200, 500, 1000, 2000];
-      for (const delay of refreshAttempts) {
-        setTimeout(() => {
-          if (isMountedRef.current) {
-            console.log(`🔄 [useAlerts] Refresh attempt after ${delay}ms`);
-            fetchAlerts();
-          }
-        }, delay);
-      }
+      // Trigger debounced refresh
+      debouncedFetchAlerts();
 
     } catch (err) {
       console.error('❌ [useAlerts] Failed to end response:', err);
       throw err;
     }
-  }, [fetchAlerts]);
+  }, [debouncedFetchAlerts]);
 
   // Cleanup function
   const cleanup = useCallback(() => {
-    console.log('🧹 [useAlerts] Cleaning up subscriptions');
+    console.log('🧹 [useAlerts] Cleaning up subscriptions and timers');
     
     // Unsubscribe from all channels
     subscriptionsRef.current.forEach(subscription => {
@@ -382,16 +401,29 @@ export function useAlerts() {
       }
     });
     subscriptionsRef.current = [];
+
+    // Clear debounce timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+
+    // Clear polling timer
+    if (pollingTimerRef.current) {
+      clearInterval(pollingTimerRef.current);
+      pollingTimerRef.current = null;
+    }
   }, []);
 
   // Manual refresh function with debug logging
   const refetch = useCallback(async () => {
     console.log('🔄 [useAlerts] Manual refresh triggered by user');
     setLoading(true);
+    setConnectionStatus('reconnecting');
     await fetchAlerts();
   }, [fetchAlerts]);
 
-  // Set up real-time subscription with comprehensive error handling and debug logging
+  // Set up real-time subscription with stable channel names and robust error handling
   useEffect(() => {
     isMountedRef.current = true;
     
@@ -399,106 +431,92 @@ export function useAlerts() {
     console.log('🚀 [useAlerts] Component mounted, starting initial fetch');
     fetchAlerts();
 
-    // Set up real-time subscriptions with better error handling and unique channel names
+    // Set up real-time subscriptions with stable channel names based on user ID
     console.log('🔌 [useAlerts] Setting up real-time subscriptions...');
     
-    const alertsSubscription = supabase
-      .channel(`alerts-dashboard-changes-${Date.now()}-${Math.random()}`)
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'alerts' },
-        (payload) => {
-          console.log('🚨 [useAlerts] Alert change detected:', {
-            eventType: payload.eventType,
-            alertId: payload.new?.id || payload.old?.id,
-            newStatus: payload.new?.status,
-            oldStatus: payload.old?.status,
-            newResponderCount: payload.new?.responder_count,
-            oldResponderCount: payload.old?.responder_count,
-            timestamp: new Date().toISOString()
-          });
-          
-          // Multiple immediate fetches with delays to handle timing issues
-          if (isMountedRef.current) {
-            console.log('🔄 [useAlerts] Triggering immediate fetch due to alert change');
+    const setupSubscriptions = async () => {
+      // Get user ID for stable channel names
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id || 'anonymous';
+      
+      const alertsSubscription = supabase
+        .channel(`alerts-dashboard-${userId}`)
+        .on('postgres_changes', 
+          { event: '*', schema: 'public', table: 'alerts' },
+          (payload) => {
+            console.log('🚨 [useAlerts] Alert change detected:', {
+              eventType: payload.eventType,
+              alertId: payload.new?.id || payload.old?.id,
+              newStatus: payload.new?.status,
+              oldStatus: payload.old?.status,
+              newResponderCount: payload.new?.responder_count,
+              oldResponderCount: payload.old?.responder_count,
+              timestamp: new Date().toISOString()
+            });
             
-            // Immediate fetch
-            fetchAlerts();
-            
-            // Additional fetches with delays to catch any timing issues
-            setTimeout(() => {
-              if (isMountedRef.current) {
-                console.log('🔄 [useAlerts] Secondary fetch after 400ms');
-                fetchAlerts();
-              }
-            }, 400);
-            
-            setTimeout(() => {
-              if (isMountedRef.current) {
-                console.log('🔄 [useAlerts] Tertiary fetch after 1000ms');
-                fetchAlerts();
-              }
-            }, 1000);
+            if (isMountedRef.current) {
+              console.log('🔄 [useAlerts] Triggering debounced fetch due to alert change');
+              setConnectionStatus('reconnecting');
+              debouncedFetchAlerts();
+            }
           }
-        }
-      )
-      .subscribe((status) => {
-        console.log('📡 [useAlerts] Alerts subscription status:', status);
-        if (status === 'SUBSCRIBED') {
-          console.log('✅ [useAlerts] Successfully subscribed to alerts changes');
-        } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
-          console.log('❌ [useAlerts] Alerts subscription failed, status:', status);
-        }
-      });
-
-    const responsesSubscription = supabase
-      .channel(`responses-dashboard-changes-${Date.now()}-${Math.random()}`)
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'responses' },
-        (payload) => {
-          console.log('👥 [useAlerts] Response change detected:', {
-            eventType: payload.eventType,
-            responseId: payload.new?.id || payload.old?.id,
-            alertId: payload.new?.alert_id || payload.old?.alert_id,
-            responderId: payload.new?.responder_id || payload.old?.responder_id,
-            status: payload.new?.status,
-            timestamp: new Date().toISOString()
-          });
+        )
+        .subscribe((status) => {
+          console.log('📡 [useAlerts] Alerts subscription status:', status);
+          if (!isMountedRef.current) return;
           
-          // Multiple immediate fetches with delays to handle timing issues
-          if (isMountedRef.current) {
-            console.log('🔄 [useAlerts] Triggering immediate fetch due to response change');
-            
-            // Immediate fetch
-            fetchAlerts();
-            
-            // Additional fetches with delays
-            setTimeout(() => {
-              if (isMountedRef.current) {
-                console.log('🔄 [useAlerts] Secondary fetch after 400ms');
-                fetchAlerts();
-              }
-            }, 400);
-            
-            setTimeout(() => {
-              if (isMountedRef.current) {
-                console.log('🔄 [useAlerts] Tertiary fetch after 1000ms');
-                fetchAlerts();
-              }
-            }, 1000);
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ [useAlerts] Successfully subscribed to alerts changes');
+            setConnectionStatus('connected');
+            stopPollingFallback();
+          } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
+            console.log('❌ [useAlerts] Alerts subscription failed, starting polling fallback');
+            setConnectionStatus('disconnected');
+            startPollingFallback();
           }
-        }
-      )
-      .subscribe((status) => {
-        console.log('📡 [useAlerts] Responses subscription status:', status);
-        if (status === 'SUBSCRIBED') {
-          console.log('✅ [useAlerts] Successfully subscribed to responses changes');
-        } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
-          console.log('❌ [useAlerts] Responses subscription failed, status:', status);
-        }
-      });
+        });
 
-    // Store subscriptions for cleanup
-    subscriptionsRef.current = [alertsSubscription, responsesSubscription];
+      const responsesSubscription = supabase
+        .channel(`responses-dashboard-${userId}`)
+        .on('postgres_changes', 
+          { event: '*', schema: 'public', table: 'responses' },
+          (payload) => {
+            console.log('👥 [useAlerts] Response change detected:', {
+              eventType: payload.eventType,
+              responseId: payload.new?.id || payload.old?.id,
+              alertId: payload.new?.alert_id || payload.old?.alert_id,
+              responderId: payload.new?.responder_id || payload.old?.responder_id,
+              status: payload.new?.status,
+              timestamp: new Date().toISOString()
+            });
+            
+            if (isMountedRef.current) {
+              console.log('🔄 [useAlerts] Triggering debounced fetch due to response change');
+              setConnectionStatus('reconnecting');
+              debouncedFetchAlerts();
+            }
+          }
+        )
+        .subscribe((status) => {
+          console.log('📡 [useAlerts] Responses subscription status:', status);
+          if (!isMountedRef.current) return;
+          
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ [useAlerts] Successfully subscribed to responses changes');
+            setConnectionStatus('connected');
+            stopPollingFallback();
+          } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED') {
+            console.log('❌ [useAlerts] Responses subscription failed, starting polling fallback');
+            setConnectionStatus('disconnected');
+            startPollingFallback();
+          }
+        });
+
+      // Store subscriptions for cleanup
+      subscriptionsRef.current = [alertsSubscription, responsesSubscription];
+    };
+
+    setupSubscriptions();
 
     // Cleanup on unmount
     return () => {
@@ -506,7 +524,7 @@ export function useAlerts() {
       isMountedRef.current = false;
       cleanup();
     };
-  }, [fetchAlerts, cleanup]);
+  }, [fetchAlerts, debouncedFetchAlerts, startPollingFallback, stopPollingFallback, cleanup]);
 
   // Debug logging for state changes
   useEffect(() => {
@@ -515,6 +533,7 @@ export function useAlerts() {
       userCommitmentsCount: Object.keys(userCommitments).length,
       loading,
       error,
+      connectionStatus,
       lastFetchTime: lastFetchTime?.toISOString(),
       alerts: alerts.map(a => ({ 
         id: a.id, 
@@ -524,7 +543,7 @@ export function useAlerts() {
         created_at: a.created_at
       }))
     });
-  }, [alerts, userCommitments, loading, error, lastFetchTime]);
+  }, [alerts, userCommitments, loading, error, connectionStatus, lastFetchTime]);
 
   return {
     alerts,
@@ -532,6 +551,7 @@ export function useAlerts() {
     loading,
     error,
     lastFetchTime,
+    connectionStatus,
     commitToAlert,
     cancelResponse,
     endResponse,

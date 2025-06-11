@@ -11,7 +11,7 @@ interface EmergencyHelpProps {
 export function EmergencyHelp({ onBack }: EmergencyHelpProps) {
   const [alertSent, setAlertSent] = useState(false);
   const [alertId, setAlertId] = useState<string | null>(null);
-  const [timeElapsed, setTimeElapsed] = useState(0);
+  const [alertCreatedAt, setAlertCreatedAt] = useState<string | null>(null);
   const { createAlert } = useMonitoringSession();
   const { stats, connectionStatus, refetch } = useRealTimeStats();
   const [locationData, setLocationData] = useState<{ general: string; precise: string } | null>(null);
@@ -74,6 +74,7 @@ export function EmergencyHelp({ onBack }: EmergencyHelpProps) {
           // Create emergency alert without a session (sessionId = null)
           const alert = await createAlert(null, locationData);
           setAlertId(alert.id);
+          setAlertCreatedAt(alert.created_at);
           console.log('✅ Emergency alert created successfully:', alert);
           
           // Trigger immediate stats refresh to get responder count
@@ -91,16 +92,6 @@ export function EmergencyHelp({ onBack }: EmergencyHelpProps) {
     };
   }, [locationData, createAlert, refetch]);
 
-  useEffect(() => {
-    if (alertSent) {
-      const interval = setInterval(() => {
-        setTimeElapsed(prev => prev + 1);
-      }, 1000);
-
-      return () => clearInterval(interval);
-    }
-  }, [alertSent]);
-
   // Refresh responder count more frequently for emergency alerts
   useEffect(() => {
     if (alertSent && alertId) {
@@ -113,10 +104,9 @@ export function EmergencyHelp({ onBack }: EmergencyHelpProps) {
     }
   }, [alertSent, alertId, refetch]);
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  const formatTriggeredTime = (createdAt: string) => {
+    const date = new Date(createdAt);
+    return `Triggered on ${date.toLocaleDateString()} at ${date.toLocaleTimeString()}`;
   };
 
   const getConnectionStatusIcon = () => {
@@ -247,12 +237,11 @@ export function EmergencyHelp({ onBack }: EmergencyHelpProps) {
                   <div>
                     <div className="flex items-center justify-center gap-2 mb-1">
                       <Clock className="w-4 h-4 text-primary-600" />
-                      <span className="text-lg font-bold font-space text-primary-900">
-                        {formatTime(timeElapsed)}
+                      <span className="text-sm font-bold font-space text-primary-900">
+                        {alertCreatedAt ? formatTriggeredTime(alertCreatedAt) : 'Just now'}
                       </span>
                     </div>
-                    <p className="text-xs text-primary-700 font-manrope">Elapsed</p>
-                    <p className="text-xs text-primary-600 font-manrope">Since alert sent</p>
+                    <p className="text-xs text-primary-700 font-manrope">Alert Time</p>
                   </div>
                 </div>
               </div>

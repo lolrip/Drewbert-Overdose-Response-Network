@@ -10,7 +10,7 @@ interface Alert {
   generalLocation: string;
   preciseLocation: string;
   responderCount: number;
-  timeElapsed: number;
+  createdAt: string; // Changed from timeElapsed to createdAt
   status: 'active' | 'responded' | 'resolved';
   isCommitted?: boolean;
 }
@@ -111,7 +111,7 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
         generalLocation: alert.general_location,
         preciseLocation: alert.precise_location,
         responderCount: stats.alertCommitments[alert.id] || alert.responder_count,
-        timeElapsed: Math.floor((Date.now() - new Date(alert.created_at).getTime()) / 1000),
+        createdAt: alert.created_at, // Store the creation timestamp
         status: alert.status as 'active' | 'responded' | 'resolved',
         isCommitted: userCommitments[alert.id] || false,
       };
@@ -122,7 +122,8 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
         statsResponderCount: stats.alertCommitments[alert.id],
         finalResponderCount: alertData.responderCount,
         isCommitted: alertData.isCommitted,
-        status: alertData.status
+        status: alertData.status,
+        createdAt: alertData.createdAt
       });
       
       return alertData;
@@ -171,10 +172,9 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
     });
   };
 
-  const formatTimeElapsed = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  const formatTriggeredTime = (createdAt: string) => {
+    const date = new Date(createdAt);
+    return `Triggered on ${date.toLocaleDateString()} at ${date.toLocaleTimeString()}`;
   };
 
   const getStatusConfig = (status: Alert['status']) => {
@@ -248,7 +248,7 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
               <div className="flex items-center gap-4 text-sm text-gray-600 font-manrope">
                 <div className="flex items-center gap-1">
                   <Clock className="w-4 h-4" />
-                  <span>{formatTimeElapsed(alert.timeElapsed)}</span>
+                  <span>{formatTriggeredTime(alert.createdAt)}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <Users className="w-4 h-4" />
@@ -392,13 +392,13 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
             </button>
           </div>
 
-          {/* Real-time Stats */}
+          {/* Real-time Stats - Only show loading state initially, prevent flickering */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-primary-50 rounded-lg p-4 text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <Users className="w-5 h-5 text-primary-600" />
                 <span className="text-2xl font-bold font-space text-primary-900">
-                  {statsLoading ? '...' : stats.activeResponders}
+                  {stats.activeResponders}
                 </span>
               </div>
               <p className="text-sm text-primary-700 font-manrope">Active Responders</p>
@@ -409,7 +409,7 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
               <div className="flex items-center justify-center gap-2 mb-2">
                 <AlertCircle className="w-5 h-5 text-accent-600" />
                 <span className="text-2xl font-bold font-space text-accent-900">
-                  {statsLoading ? '...' : stats.committedResponders}
+                  {stats.committedResponders}
                 </span>
               </div>
               <p className="text-sm text-accent-700 font-manrope">Committed Responders</p>
@@ -420,7 +420,7 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
               <div className="flex items-center justify-center gap-2 mb-2">
                 <AlertCircle className="w-5 h-5 text-coral-600" />
                 <span className="text-2xl font-bold font-space text-coral-900">
-                  {alertsLoading ? '...' : activeAlerts.length}
+                  {activeAlerts.length}
                 </span>
               </div>
               <p className="text-sm text-coral-700 font-manrope">Active Alerts</p>

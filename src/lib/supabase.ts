@@ -57,6 +57,25 @@ export const withRetry = async <T>(
   throw lastError!;
 };
 
+// Update last_seen timestamp for a user (used to track online responders)
+export const updateUserLastSeen = async (): Promise<void> => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const now = new Date().toISOString();
+    
+    await supabase
+      .from('profiles')
+      .update({ last_seen_at: now })
+      .eq('id', user.id);
+      
+    console.log('✅ Updated user last_seen_at timestamp');
+  } catch (error) {
+    console.error('❌ Failed to update last_seen timestamp:', error);
+  }
+};
+
 export type Database = {
   public: {
     Tables: {

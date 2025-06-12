@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { LandingPage } from './components/LandingPage';
 import { MonitoringView } from './components/MonitoringView';
 import { ResponderDashboard } from './components/ResponderDashboard';
@@ -7,11 +7,26 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { EmergencyHelp } from './components/EmergencyHelp';
 import { FloatingAssistant } from './components/FloatingAssistant';
 import { AuthWrapper } from './components/AuthWrapper';
+import { NotificationProvider } from './components/Notification';
+import { updateUserLastSeen } from './lib/supabase';
 
 type View = 'landing' | 'monitoring' | 'dashboard' | 'emergency' | 'responder-profile' | 'admin-dashboard';
 
 function App() {
   const [currentView, setCurrentView] = useState<View>('landing');
+  
+  // Update the user's last_seen_at timestamp periodically
+  useEffect(() => {
+    // Update on initial load
+    updateUserLastSeen();
+    
+    // Then update every minute
+    const interval = setInterval(() => {
+      updateUserLastSeen();
+    }, 60 * 1000); // Every minute
+    
+    return () => clearInterval(interval);
+  }, []);
 
   const handleStartMonitoring = () => {
     setCurrentView('monitoring');
@@ -42,8 +57,15 @@ function App() {
   };
 
   const handleAlert = (location: { general: string; precise: string }) => {
-    // In a real app, this would send the alert to the backend
-    console.log('Alert triggered for location:', location);
+    // Alert was already created by MonitoringView, just navigate to emergency screen
+    console.log('🎯 [App] handleAlert called with location:', location);
+    console.log('🎯 [App] Current sessionStorage active_alert:', sessionStorage.getItem('active_alert'));
+    
+    // Set a flag to indicate this is coming from MonitoringView
+    sessionStorage.setItem('from_monitoring', 'true');
+    console.log('🎯 [App] Set from_monitoring flag and navigating to emergency');
+    
+    setCurrentView('emergency');
   };
 
   // Views that require authentication
@@ -105,12 +127,14 @@ function App() {
   ) : currentComponent;
 
   return (
-    <div className="relative">
-      {wrappedComponent}
-      
-      {/* Floating AI Assistant - available on all pages */}
-      <FloatingAssistant />
-    </div>
+    <NotificationProvider>
+      <div className="relative">
+        {wrappedComponent}
+        
+        {/* Floating AI Assistant - available on all pages */}
+        <FloatingAssistant />
+      </div>
+    </NotificationProvider>
   );
 }
 

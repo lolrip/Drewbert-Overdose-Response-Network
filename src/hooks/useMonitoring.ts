@@ -21,6 +21,7 @@ export function useMonitoring() {
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const onAlertCallback = useRef<(() => void) | null>(null);
+  const alertTriggeredRef = useRef<boolean>(false);
 
   const prompts = [
     "Hey there! Just checking in - how are you feeling right now?",
@@ -38,6 +39,9 @@ export function useMonitoring() {
   }, []);
 
   const startMonitoring = useCallback(() => {
+    // Reset alert trigger flag when starting new monitoring session
+    alertTriggeredRef.current = false;
+    
     setState(prev => ({
       ...prev,
       isActive: true,
@@ -84,8 +88,10 @@ export function useMonitoring() {
               promptMessage: '',
             };
           } else if (prev.phase === 'final_warning') {
-            // Send alert
-            if (onAlertCallback.current) {
+            // Send alert (but only once)
+            if (onAlertCallback.current && !alertTriggeredRef.current) {
+              alertTriggeredRef.current = true;
+              console.log('🚨 [useMonitoring] Triggering alert callback (once)');
               onAlertCallback.current();
             }
             return {

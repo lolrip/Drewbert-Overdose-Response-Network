@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { AlertCircle, CheckCircle, Clock, Heart, ArrowLeft, AlertTriangle, MessageCircle, MapPin, Eye, EyeOff, Edit3, Save, X } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { AlertCircle, CheckCircle, Heart, ArrowLeft, AlertTriangle, MessageCircle, MapPin, Edit3, Save, X } from 'lucide-react';
 import { useMonitoring } from '../hooks/useMonitoring';
 import { useMonitoringSession } from '../hooks/useMonitoringSession';
 import { getCurrentLocation, reverseGeocode, formatGeneralLocation, formatPreciseLocation } from '../lib/location';
+import { useNotifications } from './Notification';
 
 interface MonitoringViewProps {
   onBack: () => void;
@@ -12,11 +13,11 @@ interface MonitoringViewProps {
 export function MonitoringView({ onBack, onAlert }: MonitoringViewProps) {
   const { state, startMonitoring, stopMonitoring, respondToCheckIn, setOnAlert } = useMonitoring();
   const { currentSession, startSession, updateCheckInCount, updateSessionLocation, endSession, createAlert } = useMonitoringSession();
+  const { showNotification } = useNotifications();
   const [locationData, setLocationData] = useState<{ general: string; precise: string } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isLocationLoading, setIsLocationLoading] = useState(true);
   const [locationPermissionDenied, setLocationPermissionDenied] = useState(false);
-  const [showPreciseLocation, setShowPreciseLocation] = useState(false);
   const [isEditingPreciseLocation, setIsEditingPreciseLocation] = useState(false);
   const [editedPreciseLocation, setEditedPreciseLocation] = useState('');
   const [locationUpdateStatus, setLocationUpdateStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -78,19 +79,46 @@ export function MonitoringView({ onBack, onAlert }: MonitoringViewProps) {
           const session = await startSession(locationData);
           console.log('Database session started:', session);
           
+          // Show notification for session start
+          showNotification('Monitoring started successfully', 'success');
+          
           // Set up the alert callback
           setOnAlert(async () => {
-            console.log('Alert triggered!');
+            console.log('🚨 [MonitoringView] Alert callback triggered!');
+            console.log('🚨 [MonitoringView] Session exists:', !!session);
+            console.log('🚨 [MonitoringView] LocationData:', locationData);
+            
             if (session) {
               try {
-                await createAlert(session.id, locationData);
+                console.log('🚨 [MonitoringView] About to call createAlert with sessionId:', session.id);
+                
+                // Create the alert in the database
+                const alert = await createAlert(session.id, locationData);
+                
+                console.log('🚨 [MonitoringView] Alert created successfully:', alert);
+                
+                // Store alert info for EmergencyHelp to use
+                const alertData = {
+                  id: alert.id,
+                  created_at: alert.created_at,
+                  location: locationData,
+                  source: 'monitoring_view'
+                };
+                
+                sessionStorage.setItem('active_alert', JSON.stringify(alertData));
+                console.log('🚨 [MonitoringView] Alert stored in sessionStorage:', alertData);
+                
+                // Navigate to emergency screen
+                console.log('🚨 [MonitoringView] About to call onAlert to navigate');
                 onAlert(locationData);
+                console.log('🚨 [MonitoringView] onAlert called successfully');
               } catch (error) {
-                console.error('Failed to create alert:', error);
+                console.error('🚨 [MonitoringView] Failed to create alert:', error);
                 // Still trigger the UI alert even if database fails
                 onAlert(locationData);
               }
             } else {
+              console.log('🚨 [MonitoringView] No session, calling onAlert directly');
               onAlert(locationData);
             }
           });
@@ -115,14 +143,17 @@ export function MonitoringView({ onBack, onAlert }: MonitoringViewProps) {
     }
   }, [currentSession, state.totalCheckins, updateCheckInCount]);
 
-  // Cleanup only on unmount
+  // Only end session on explicit user action, not on unmounting or navigation
+  // This ensures the monitoring session persists across navigation
   useEffect(() => {
     return () => {
-      console.log('Component unmounting - cleaning up monitoring...');
+      console.log('Component unmounting - preserving monitoring session...');
+      // Stop local monitoring timers but don't end the session
       stopMonitoring();
-      if (currentSession) {
-        endSession(currentSession.id, 'completed').catch(console.error);
-      }
+      
+      // We no longer automatically end the session on component unmount
+      // Sessions will now persist until explicitly ended by the user
+      // or until the page is refreshed
     };
   }, []); // Empty dependency array means this only runs on unmount
 
@@ -207,10 +238,31 @@ export function MonitoringView({ onBack, onAlert }: MonitoringViewProps) {
   const handleStopMonitoring = () => {
     console.log('Manually stopping monitoring...');
     stopMonitoring();
+    
     if (currentSession) {
-      endSession(currentSession.id, 'completed').catch(console.error);
+      endSession(currentSession.id, 'completed')
+        .then(() => {
+          // Show success notification
+          showNotification('Monitoring stopped successfully', 'success');
+          // Brief delay to allow notification to be seen
+          setTimeout(() => {
+            onBack();
+          }, 1000);
+        })
+        .catch(error => {
+          console.error('Failed to end session:', error);
+          showNotification('Failed to end monitoring session', 'error');
+          // Still navigate back
+          setTimeout(() => {
+            onBack();
+          }, 1000);
+        });
+    } else {
+      showNotification('Monitoring stopped', 'info');
+      setTimeout(() => {
+        onBack();
+      }, 1000);
     }
-    onBack();
   };
 
   const handleEditPreciseLocation = () => {
@@ -459,82 +511,58 @@ export function MonitoringView({ onBack, onAlert }: MonitoringViewProps) {
                   <div className="bg-gray-50 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-medium font-space text-gray-900">Precise Location</h4>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs bg-coral-200 text-coral-800 px-2 py-1 rounded-full font-manrope">
-                          Private
-                        </span>
-                        <button
-                          onClick={() => setShowPreciseLocation(!showPreciseLocation)}
-                          className="p-1 hover:bg-gray-200 rounded transition-colors"
-                          title={showPreciseLocation ? 'Hide precise location' : 'Show precise location'}
-                        >
-                          {showPreciseLocation ? (
-                            <EyeOff className="w-4 h-4 text-gray-600" />
-                          ) : (
-                            <Eye className="w-4 h-4 text-gray-600" />
-                          )}
-                        </button>
-                      </div>
+                      <span className="text-xs bg-coral-200 text-coral-800 px-2 py-1 rounded-full font-manrope">
+                        Private
+                      </span>
                     </div>
                     
-                    {showPreciseLocation ? (
-                      <div>
-                        {isEditingPreciseLocation ? (
-                          <div className="space-y-3">
-                            <textarea
-                              value={editedPreciseLocation}
-                              onChange={(e) => setEditedPreciseLocation(e.target.value)}
-                              className="w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg font-manrope focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
-                              rows={3}
-                              placeholder="Enter your precise location..."
-                            />
-                            <div className="flex gap-2">
-                              <button
-                                onClick={handleSavePreciseLocation}
-                                disabled={locationUpdateStatus === 'saving'}
-                                className="flex items-center gap-1 px-3 py-2 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-400 text-white text-sm font-manrope rounded-lg transition-colors"
-                              >
-                                <Save className="w-4 h-4" />
-                                {locationUpdateStatus === 'saving' ? 'Saving...' : 'Save'}
-                              </button>
-                              <button
-                                onClick={handleCancelEditPreciseLocation}
-                                disabled={locationUpdateStatus === 'saving'}
-                                className="flex items-center gap-1 px-3 py-2 bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 text-gray-700 text-sm font-manrope rounded-lg transition-colors"
-                              >
-                                <X className="w-4 h-4" />
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div>
-                            <p className="text-sm text-gray-800 font-manrope mb-2 font-mono bg-white p-2 rounded border">
-                              {locationData.precise}
-                            </p>
-                            <p className="text-xs text-gray-700 font-manrope mb-3">
-                              This exact location is only shared with responders who commit to helping you.
-                            </p>
+                    <div>
+                      {isEditingPreciseLocation ? (
+                        <div className="space-y-3">
+                          <textarea
+                            value={editedPreciseLocation}
+                            onChange={(e) => setEditedPreciseLocation(e.target.value)}
+                            className="w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg font-manrope focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+                            rows={3}
+                            placeholder="Enter your precise location..."
+                          />
+                          <div className="flex gap-2">
                             <button
-                              onClick={handleEditPreciseLocation}
-                              className="flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700 font-manrope"
+                              onClick={handleSavePreciseLocation}
+                              disabled={locationUpdateStatus === 'saving'}
+                              className="flex items-center gap-1 px-3 py-2 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-400 text-white text-sm font-manrope rounded-lg transition-colors"
                             >
-                              <Edit3 className="w-4 h-4" />
-                              Edit Location
+                              <Save className="w-4 h-4" />
+                              {locationUpdateStatus === 'saving' ? 'Saving...' : 'Save'}
+                            </button>
+                            <button
+                              onClick={handleCancelEditPreciseLocation}
+                              disabled={locationUpdateStatus === 'saving'}
+                              className="flex items-center gap-1 px-3 py-2 bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 text-gray-700 text-sm font-manrope rounded-lg transition-colors"
+                            >
+                              <X className="w-4 h-4" />
+                              Cancel
                             </button>
                           </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div>
-                        <p className="text-sm text-gray-600 font-manrope mb-2 italic">
-                          Click the eye icon to view your precise location
-                        </p>
-                        <p className="text-xs text-gray-700 font-manrope">
-                          Your exact location is securely stored and only shared with committed responders.
-                        </p>
-                      </div>
-                    )}
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="text-sm text-gray-800 font-manrope mb-2 font-mono bg-white p-2 rounded border">
+                            {locationData.precise}
+                          </p>
+                          <p className="text-xs text-gray-700 font-manrope mb-3">
+                            This exact location is only shared with responders who commit to helping you.
+                          </p>
+                          <button
+                            onClick={handleEditPreciseLocation}
+                            className="flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700 font-manrope"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                            Edit Location
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

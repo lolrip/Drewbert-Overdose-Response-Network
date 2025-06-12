@@ -2,13 +2,18 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase, withRetry } from '../lib/supabase';
 
 interface RealTimeStats {
-  activeResponders: number;
+  activeResponders: number; // now tracks online responders
   committedResponders: number;
   alertCommitments: Record<string, number>; // alertId -> number of committed responders
 }
 
 interface ConnectionStatus {
   connectionStatus: 'connected' | 'reconnecting' | 'disconnected';
+}
+
+interface OnlineUser {
+  user_id: string;
+  last_seen_at: string;
 }
 
 export function useRealTimeStats() {
@@ -79,10 +84,11 @@ export function useRealTimeStats() {
       await new Promise(resolve => setTimeout(resolve, 300));
 
       // Fetch all data with proper error handling and retries
+      // Now including last_seen_at for online responder tracking
       const [respondersResult, responsesResult, alertsResult] = await Promise.allSettled([
         withRetry(() => supabase
           .from('profiles')
-          .select('id, is_responder')
+          .select('id, is_responder, last_seen_at')
           .eq('is_responder', true), 3, 300),
         withRetry(() => supabase
           .from('responses')
@@ -100,10 +106,20 @@ export function useRealTimeStats() {
       let hasError = false;
       let errorMessage = '';
 
-      // Process responders result
+      // Process responders result - now checking for online responders
       if (respondersResult.status === 'fulfilled' && !respondersResult.value.error) {
-        activeResponders = respondersResult.value.data?.length || 0;
-        console.log('📊 [useRealTimeStats] Active responders:', activeResponders);
+        // Instead of counting all responders, we now look for responders seen in the last 5 minutes
+        const profiles = respondersResult.value.data || [];
+        const now = new Date();
+        const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000); // 5 minutes ago
+        
+        // Count responders who have been online in the last 5 minutes
+        activeResponders = profiles.filter((profile: any) => {
+          return profile.is_responder && profile.last_seen_at && 
+                 new Date(profile.last_seen_at) >= fiveMinutesAgo;
+        }).length;
+        
+        console.log('📊 [useRealTimeStats] Online responders:', activeResponders);
       } else {
         hasError = true;
         errorMessage = respondersResult.status === 'rejected'

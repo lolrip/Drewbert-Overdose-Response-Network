@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { supabase, withRetry } from '../lib/supabase';
 
 interface LocationData {
@@ -15,10 +15,109 @@ interface MonitoringSession {
   started_at: string;
 }
 
+// Session storage keys
+const SESSION_STORAGE_KEY = 'monitoring_session';
+const ALERT_STORAGE_KEY = 'active_alert';
+
 export function useMonitoringSession() {
   const [currentSession, setCurrentSession] = useState<MonitoringSession | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Load existing session from sessionStorage on mount
+  useEffect(() => {
+    const savedSession = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    if (savedSession) {
+      try {
+        const parsedSession = JSON.parse(savedSession);
+        setCurrentSession(parsedSession);
+        console.log('📱 Restored session from storage:', parsedSession.id);
+      } catch (error) {
+        console.error('❌ Failed to parse saved session:', error);
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      }
+    }
+  }, []);
+
+  // Save session to sessionStorage whenever it changes
+  useEffect(() => {
+    if (currentSession) {
+      sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(currentSession));
+    } else {
+      sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    }
+  }, [currentSession]);
+
+  const checkForExistingSession = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+
+      // Check for existing active session in database
+      const { data: existingSessions, error } = await supabase
+        .from('monitoring_sessions')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('started_at', { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error('❌ Error checking for existing sessions:', error);
+        return null;
+      }
+
+      if (existingSessions && existingSessions.length > 0) {
+        const session = existingSessions[0];
+        console.log('🔍 Found existing active session:', session.id);
+        setCurrentSession(session);
+        return session;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('❌ Failed to check for existing session:', error);
+      return null;
+    }
+  }, []);
+
+  const checkForExistingAlert = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+
+      // Check for existing active alert for this user
+      const { data: existingAlerts, error } = await supabase
+        .from('alerts')
+        .select('*')
+        .eq('user_id', user.id)
+        .in('status', ['active', 'responded'])
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error('❌ Error checking for existing alerts:', error);
+        return null;
+      }
+
+      if (existingAlerts && existingAlerts.length > 0) {
+        const alert = existingAlerts[0];
+        console.log('🚨 Found existing active alert:', alert.id);
+        // Store alert ID in sessionStorage for reference
+        sessionStorage.setItem(ALERT_STORAGE_KEY, JSON.stringify({
+          id: alert.id,
+          created_at: alert.created_at,
+          status: alert.status
+        }));
+        return alert;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('❌ Failed to check for existing alert:', error);
+      return null;
+    }
+  }, []);
 
   const startSession = useCallback(async (locationData: LocationData) => {
     setLoading(true);
@@ -27,6 +126,16 @@ export function useMonitoringSession() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       console.log('🔍 Starting session for user:', user?.id ? 'authenticated' : 'anonymous');
+      
+      // First, check if there's an existing active session
+      if (user?.id) {
+        const existingSession = await checkForExistingSession();
+        if (existingSession) {
+          console.log('♻️ Using existing active session:', existingSession.id);
+          setLoading(false);
+          return existingSession;
+        }
+      }
       
       // Generate anonymous ID for anonymous users
       const anonymousId = user?.id ? null : crypto.randomUUID();
@@ -156,7 +265,7 @@ export function useMonitoringSession() {
     try {
       console.log('📍 Updating session location:', sessionId, locationData);
       
-      const { error } = await withRetry(() =>
+      const result: any = await withRetry(() =>
         supabase
           .from('monitoring_sessions')
           .update({ 
@@ -166,9 +275,9 @@ export function useMonitoringSession() {
           .eq('id', sessionId)
       );
 
-      if (error) {
-        console.error('❌ Error updating session location:', error);
-        throw error;
+      if (result.error) {
+        console.error('❌ Error updating session location:', result.error);
+        throw result.error;
       }
 
       setCurrentSession(prev => prev ? { 
@@ -206,14 +315,18 @@ export function useMonitoringSession() {
   }, []);
 
   const createAlert = useCallback(async (sessionId: string | null, locationData: LocationData) => {
+    const callId = Math.random().toString(36).substr(2, 9);
     try {
-      console.log('🚨 Creating alert for session:', sessionId);
+      console.log(`🚨 [createAlert-${callId}] Creating alert for session:`, sessionId);
+      console.log(`🚨 [createAlert-${callId}] LocationData:`, locationData);
+      
       const { data: { user } } = await supabase.auth.getUser();
+      console.log(`🚨 [createAlert-${callId}] User:`, user?.id || 'anonymous');
       
       const anonymousId = user?.id ? null : crypto.randomUUID();
 
       // Use the new optimized alert creation function
-      console.log('📝 Using optimized alert creation function...');
+      console.log(`📝 [createAlert-${callId}] Using optimized alert creation function...`);
       const { data: alertId, error } = await supabase.rpc('create_alert_with_notification', {
         p_session_id: sessionId,
         p_user_id: user?.id || null,
@@ -223,10 +336,10 @@ export function useMonitoringSession() {
       });
 
       if (error) {
-        console.error('❌ Error creating alert with notification:', error);
+        console.error(`❌ [createAlert-${callId}] Error creating alert with notification:`, error);
         
         // Fallback to regular insert if the function fails
-        console.log('🔄 Falling back to regular alert creation...');
+        console.log(`🔄 [createAlert-${callId}] Falling back to regular alert creation...`);
         const alertData = {
           session_id: sessionId,
           user_id: user?.id || null,
@@ -237,7 +350,7 @@ export function useMonitoringSession() {
           responder_count: 0,
         };
 
-        const { data: fallbackData, error: fallbackError } = await withRetry(() =>
+        const fallbackResult: any = await withRetry(() =>
           supabase
             .from('alerts')
             .insert(alertData)
@@ -245,22 +358,22 @@ export function useMonitoringSession() {
             .single()
         );
 
-        if (fallbackError) {
-          console.error('❌ Fallback alert creation failed:', fallbackError);
-          throw fallbackError;
+        if (fallbackResult.error) {
+          console.error('❌ Fallback alert creation failed:', fallbackResult.error);
+          throw fallbackResult.error;
         }
 
-        console.log('✅ Alert created successfully (fallback):', fallbackData);
+        console.log(`✅ [createAlert-${callId}] Alert created successfully (fallback):`, fallbackResult.data);
 
         // End the session with emergency status if sessionId provided
         if (sessionId) {
           await endSession(sessionId, 'emergency');
         }
 
-        return fallbackData;
+        return fallbackResult.data;
       }
 
-      console.log('✅ Alert created successfully with notification:', alertId);
+      console.log(`✅ [createAlert-${callId}] Alert created successfully with notification:`, alertId);
 
       // Get the full alert data
       const { data: alertData, error: fetchError } = await supabase
@@ -270,7 +383,7 @@ export function useMonitoringSession() {
         .single();
 
       if (fetchError) {
-        console.error('❌ Error fetching created alert:', fetchError);
+        console.error(`❌ [createAlert-${callId}] Error fetching created alert:`, fetchError);
         throw fetchError;
       }
 
@@ -282,9 +395,10 @@ export function useMonitoringSession() {
       // Force a small delay to ensure database consistency
       await new Promise(resolve => setTimeout(resolve, 100));
 
+      console.log(`✅ [createAlert-${callId}] Returning alert data:`, alertData);
       return alertData;
     } catch (err) {
-      console.error('❌ Failed to create alert:', err);
+      console.error(`❌ [createAlert-${callId}] Failed to create alert:`, err);
       throw err;
     }
   }, [endSession]);
@@ -293,7 +407,7 @@ export function useMonitoringSession() {
     try {
       console.log('📍 Updating alert location:', alertId, locationData);
       
-      const { error } = await withRetry(() =>
+      const result: any = await withRetry(() =>
         supabase
           .from('alerts')
           .update({ 
@@ -304,9 +418,9 @@ export function useMonitoringSession() {
           .eq('id', alertId)
       );
 
-      if (error) {
-        console.error('❌ Error updating alert location:', error);
-        throw error;
+      if (result.error) {
+        console.error('❌ Error updating alert location:', result.error);
+        throw result.error;
       }
 
       console.log('✅ Alert location updated successfully');
@@ -316,6 +430,34 @@ export function useMonitoringSession() {
       throw err;
     }
   }, []);
+
+  const cancelAlert = useCallback(async (alertId: string) => {
+    try {
+      console.log('🚫 Cancelling alert:', alertId);
+      
+      const { error } = await supabase
+        .from('alerts')
+        .update({ 
+          status: 'cancelled',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', alertId);
+
+      if (error) {
+        console.error('❌ Error cancelling alert:', error);
+        throw error;
+      }
+
+      console.log('✅ Alert cancelled successfully');
+      // Clear from session storage
+      sessionStorage.removeItem('active_alert');
+      
+      return true;
+    } catch (err) {
+      console.error('❌ Failed to cancel alert:', err);
+      throw err;
+    }
+  }, [supabase]);
 
   return {
     currentSession,
@@ -327,5 +469,6 @@ export function useMonitoringSession() {
     endSession,
     createAlert,
     updateAlertLocation,
+    cancelAlert,
   };
 }

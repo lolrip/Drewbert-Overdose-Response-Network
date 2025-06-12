@@ -6,7 +6,7 @@ interface Alert {
   session_id: string;
   user_id: string | null;
   anonymous_id: string | null;
-  status: 'active' | 'responded' | 'resolved' | 'false_alarm';
+  status: 'active' | 'responded' | 'resolved' | 'cancelled' | 'false_alarm';
   general_location: string;
   precise_location: string;
   responder_count: number;
@@ -58,7 +58,7 @@ export function useAlerts() {
     
     try {
       const fetchStartTime = new Date();
-      console.log('🔄 [useAlerts] Fetching alerts at:', fetchStartTime.toISOString());
+      console.log('🔄 [useAlerts] Fetching alerts at:', fetchStartTime.toISOString(), '(Cached data may appear below)');
       
       // First, let's check what user we're authenticated as
       const { data: { user } } = await supabase.auth.getUser();
@@ -98,7 +98,7 @@ export function useAlerts() {
         supabase
           .from('alerts')
           .select('*')
-          .in('status', ['active', 'responded'])
+          .in('status', ['active', 'responded', 'cancelled'])
           .order('created_at', { ascending: false }),
         5, // More retries
         800 // Longer delay between retries
@@ -207,14 +207,14 @@ export function useAlerts() {
       clearInterval(pollingTimerRef.current);
     }
 
-    console.log('🔄 [useAlerts] Starting polling fallback (10s interval)');
+    console.log('🔄 [useAlerts] Starting polling fallback (5s interval)');
     pollingTimerRef.current = setInterval(() => {
       if (isMountedRef.current) {
         console.log('⏰ [useAlerts] Polling fallback fetch');
         setConnectionStatus('reconnecting');
         fetchAlerts();
       }
-    }, 10000);
+    }, 5000); // Reduced to 5 seconds for more responsive updates
   }, [fetchAlerts]);
 
   // Stop polling fallback when subscriptions work
@@ -296,33 +296,127 @@ export function useAlerts() {
       if (!user) throw new Error('Must be authenticated');
 
       console.log('🚫 [useAlerts] Cancelling response for alert:', alertId, 'Reason:', cancellationReason);
+      console.log('🔍 [useAlerts] User ID:', user.id);
+      console.log('🔍 [useAlerts] Current commitments before cancel:', userCommitments);
 
-      // Use the safe cancellation function that handles both response deletion and count/status update
-      const { data: success, error } = await supabase.rpc('cancel_response_safe', {
-        p_alert_id: alertId,
-        p_responder_id: user.id,
-        p_reason: cancellationReason.reason + (cancellationReason.details ? ': ' + cancellationReason.details : '')
-      });
+      // Try to use the safe cancellation function first
+      let success = false;
+      let error = null;
 
-      if (error) {
-        console.error('❌ [useAlerts] Failed to cancel response:', error);
-        throw error;
+      console.log('📞 [useAlerts] Trying cancel_response_safe function first...');
+      try {
+        const result = await supabase.rpc('cancel_response_safe', {
+          p_alert_id: alertId,
+          p_responder_id: user.id,
+          p_reason: cancellationReason.reason + (cancellationReason.details ? ': ' + cancellationReason.details : '')
+        });
+        
+        success = result.data;
+        error = result.error;
+        console.log('📞 [useAlerts] cancel_response_safe returned:', { success, error });
+      } catch (rpcError) {
+        console.error('❌ [useAlerts] RPC call failed:', rpcError);
+        error = rpcError;
       }
 
-      if (!success) {
-        throw new Error('Response not found or already cancelled');
+      // If the RPC function fails, perform manual fallback cancellation
+      if (error || !success) {
+        console.log('🔄 [useAlerts] RPC function failed, trying manual fallback...');
+
+        // STEP 1: Delete the response record
+        console.log('🗑️ [useAlerts] Deleting response record...');
+        const { error: deleteError } = await supabase
+          .from('responses')
+          .delete()
+          .eq('alert_id', alertId)
+          .eq('responder_id', user.id);
+
+        if (deleteError) {
+          console.error('❌ [useAlerts] Failed to delete response:', deleteError);
+          throw deleteError;
+        }
+
+        // STEP 2: Save cancellation reason (if the cancellations table exists)
+        try {
+          console.log('📝 [useAlerts] Saving cancellation reason...');
+          await supabase
+            .from('response_cancellations')
+            .insert({
+              alert_id: alertId,
+              responder_id: user.id,
+              reason: cancellationReason.reason,
+              details: cancellationReason.details || null
+            });
+        } catch (cancellationError) {
+          // This might fail if the table doesn't exist yet, which is fine
+          console.log('ℹ️ [useAlerts] Could not save cancellation reason:', cancellationError);
+        }
+
+        // STEP 3: Decrement the responder count
+        console.log('🔻 [useAlerts] Decrementing responder count...');
+        const { data: alertData } = await supabase
+          .from('alerts')
+          .select('responder_count')
+          .eq('id', alertId)
+          .single();
+
+        const currentCount = alertData?.responder_count || 0;
+        const newCount = Math.max(0, currentCount - 1);
+
+        // STEP 4: Update the alert - set to cancelled if no more responders
+        console.log('🔄 [useAlerts] Updating alert status...', {
+          currentCount,
+          newCount,
+          willCancelAlert: newCount === 0
+        });
+        
+        if (newCount === 0) {
+          // No more responders, set status to cancelled
+          const { data: updateData, error: updateError } = await supabase
+            .from('alerts')
+            .update({ 
+              responder_count: newCount,
+              status: 'cancelled',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', alertId);
+          
+          if (updateError) {
+            console.error('❌ [useAlerts] Failed to update alert status:', updateError);
+          } else {
+            console.log('✅ [useAlerts] Alert status updated to cancelled');
+          }
+        } else {
+          // Still has responders, just update the count
+          const { data: updateData, error: updateError } = await supabase
+            .from('alerts')
+            .update({ 
+              responder_count: newCount,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', alertId);
+          
+          if (updateError) {
+            console.error('❌ [useAlerts] Failed to update responder count:', updateError);
+          } else {
+            console.log('✅ [useAlerts] Responder count updated to', newCount);
+          }
+        }
       }
 
       console.log('✅ [useAlerts] Response cancelled successfully');
 
       // Update local state immediately for better UX
+      console.log('🔄 [useAlerts] Updating local state...');
       setUserCommitments(prev => {
         const updated = { ...prev };
         delete updated[alertId];
+        console.log('🔄 [useAlerts] Updated commitments:', updated);
         return updated;
       });
 
       // Trigger debounced refresh
+      console.log('🔄 [useAlerts] Triggering debounced refresh...');
       debouncedFetchAlerts();
 
       // Log the cancellation for analytics
@@ -420,7 +514,39 @@ export function useAlerts() {
     console.log('🔄 [useAlerts] Manual refresh triggered by user');
     setLoading(true);
     setConnectionStatus('reconnecting');
-    await fetchAlerts();
+    
+    // Force a direct fetch of alerts bypassing any caching
+    console.log('⚡ [useAlerts] Forcing direct database query...');
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // Fetch ALL alerts directly with no caching
+      const { data: directAlerts, error } = await supabase
+        .from('alerts')
+        .select('*')
+        .in('status', ['active', 'responded', 'cancelled'])
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('❌ [useAlerts] Direct database query failed:', error);
+      } else {
+        console.log('📊 [useAlerts] Direct database query results:', {
+          count: directAlerts?.length || 0,
+          alerts: directAlerts?.map(a => ({ 
+            id: a.id, 
+            status: a.status, 
+            responder_count: a.responder_count,
+          })) || []
+        });
+      }
+      
+      // Now use the normal fetch path
+      await fetchAlerts();
+    } catch (error) {
+      console.error('❌ [useAlerts] Manual refresh error:', error);
+      await fetchAlerts(); // Still try the normal path as fallback
+    }
   }, [fetchAlerts]);
 
   // Set up real-time subscription with stable channel names and robust error handling
@@ -431,16 +557,19 @@ export function useAlerts() {
     console.log('🚀 [useAlerts] Component mounted, starting initial fetch');
     fetchAlerts();
 
-    // Set up real-time subscriptions with stable channel names based on user ID
+    // Set up real-time subscriptions with stable channel names
     console.log('🔌 [useAlerts] Setting up real-time subscriptions...');
     
     const setupSubscriptions = async () => {
       // Get user ID for stable channel names
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id || 'anonymous';
+      const timestamp = Date.now();
       
+      console.log('🔧 [useAlerts] Creating subscriptions for user:', userId);
+
       const alertsSubscription = supabase
-        .channel(`alerts-dashboard-${userId}`)
+        .channel(`alerts-dashboard-${userId}-${timestamp}`) // Add timestamp for unique channel
         .on('postgres_changes', 
           { event: '*', schema: 'public', table: 'alerts' },
           (payload) => {
@@ -455,9 +584,10 @@ export function useAlerts() {
             });
             
             if (isMountedRef.current) {
-              console.log('🔄 [useAlerts] Triggering debounced fetch due to alert change');
+              console.log('🔄 [useAlerts] Triggering immediate fetch due to alert change');
               setConnectionStatus('reconnecting');
-              debouncedFetchAlerts();
+              // Use immediate fetch for more responsive updates
+              fetchAlerts();
             }
           }
         )
@@ -477,7 +607,7 @@ export function useAlerts() {
         });
 
       const responsesSubscription = supabase
-        .channel(`responses-dashboard-${userId}`)
+        .channel(`responses-dashboard-${userId}-${timestamp}`) // Add timestamp for unique channel
         .on('postgres_changes', 
           { event: '*', schema: 'public', table: 'responses' },
           (payload) => {
@@ -491,9 +621,10 @@ export function useAlerts() {
             });
             
             if (isMountedRef.current) {
-              console.log('🔄 [useAlerts] Triggering debounced fetch due to response change');
+              console.log('🔄 [useAlerts] Triggering immediate fetch due to response change');
               setConnectionStatus('reconnecting');
-              debouncedFetchAlerts();
+              // Use immediate fetch for more responsive updates
+              fetchAlerts();
             }
           }
         )
@@ -514,9 +645,22 @@ export function useAlerts() {
 
       // Store subscriptions for cleanup
       subscriptionsRef.current = [alertsSubscription, responsesSubscription];
+      
+      console.log('📋 [useAlerts] Subscriptions created and stored:', {
+        alertsChannel: alertsSubscription.topic,
+        responsesChannel: responsesSubscription.topic
+      });
     };
 
     setupSubscriptions();
+
+    // Start polling fallback immediately as a safety net
+    setTimeout(() => {
+      if (isMountedRef.current && connectionStatus !== 'connected') {
+        console.log('🚨 [useAlerts] Starting immediate polling fallback as safety net');
+        startPollingFallback();
+      }
+    }, 3000); // Give subscriptions 3 seconds to connect
 
     // Cleanup on unmount
     return () => {
@@ -524,7 +668,7 @@ export function useAlerts() {
       isMountedRef.current = false;
       cleanup();
     };
-  }, [fetchAlerts, debouncedFetchAlerts, startPollingFallback, stopPollingFallback, cleanup]);
+  }, []); // Remove all dependencies to prevent re-subscription
 
   // Debug logging for state changes
   useEffect(() => {

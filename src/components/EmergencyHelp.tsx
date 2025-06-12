@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, AlertTriangle, Phone, MapPin, Clock, Users, Wifi, WifiOff, RefreshCw } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ArrowLeft, AlertTriangle, Phone, MapPin, Clock, Users, Wifi, WifiOff, RefreshCw, Edit3, Save, X } from 'lucide-react';
 import { useMonitoringSession } from '../hooks/useMonitoringSession';
 import { useRealTimeStats } from '../hooks/useRealTimeStats';
 import { getCurrentLocation, reverseGeocode, formatGeneralLocation, formatPreciseLocation } from '../lib/location';
+import { useNotifications } from './Notification';
 
 interface EmergencyHelpProps {
   onBack: () => void;
@@ -12,11 +13,15 @@ export function EmergencyHelp({ onBack }: EmergencyHelpProps) {
   const [alertSent, setAlertSent] = useState(false);
   const [alertId, setAlertId] = useState<string | null>(null);
   const [alertCreatedAt, setAlertCreatedAt] = useState<string | null>(null);
-  const { createAlert } = useMonitoringSession();
+  const { createAlert, cancelAlert } = useMonitoringSession();
   const { stats, connectionStatus, refetch } = useRealTimeStats();
   const [locationData, setLocationData] = useState<{ general: string; precise: string } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [locationPermissionDenied, setLocationPermissionDenied] = useState(false);
+  const [isEditingPreciseLocation, setIsEditingPreciseLocation] = useState(false);
+  const [editedPreciseLocation, setEditedPreciseLocation] = useState('');
+  const [locationUpdateStatus, setLocationUpdateStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const { showNotification } = useNotifications();
 
   // Get responder count for this specific alert
   const responderCount = alertId ? (stats.alertCommitments[alertId] || 0) : 0;
@@ -63,34 +68,99 @@ export function EmergencyHelp({ onBack }: EmergencyHelpProps) {
     collectLocation();
   }, []);
 
+  // Check if an alert is already in progress from MonitoringView
   useEffect(() => {
-    // Simulate sending alert
+    console.log('🔍 [EmergencyHelp] First useEffect running - checking for existing alert');
+    
+    const existingAlert = sessionStorage.getItem('active_alert');
+    const fromMonitoring = sessionStorage.getItem('from_monitoring');
+    
+    console.log('🔍 [EmergencyHelp] existingAlert:', existingAlert);
+    console.log('🔍 [EmergencyHelp] fromMonitoring:', fromMonitoring);
+    console.log('🔍 [EmergencyHelp] Current alertSent state:', alertSent);
+    console.log('🔍 [EmergencyHelp] Current alertId state:', alertId);
+    
+    if (existingAlert) {
+      try {
+        const parsedAlert = JSON.parse(existingAlert);
+        console.log('🔍 [EmergencyHelp] Parsed existing alert:', parsedAlert);
+        
+        setAlertSent(true);
+        setAlertId(parsedAlert.id);
+        setAlertCreatedAt(parsedAlert.created_at);
+        console.log('📱 [EmergencyHelp] Using existing alert from monitoring view:', parsedAlert.id);
+        
+        // Clear the flags
+        sessionStorage.removeItem('from_monitoring');
+        console.log('🔍 [EmergencyHelp] Cleared from_monitoring flag');
+        
+        // Trigger stats refresh for existing alert
+        setTimeout(() => {
+          refetch();
+        }, 500);
+        return; // Exit early if existing alert found
+      } catch (error) {
+        console.error('❌ [EmergencyHelp] Failed to parse stored alert:', error);
+      }
+    }
+    
+    // If we came from monitoring but no alert found, something went wrong
+    if (fromMonitoring) {
+      console.warn('⚠️ [EmergencyHelp] Came from monitoring but no alert found in storage');
+      sessionStorage.removeItem('from_monitoring');
+    }
+  }, [refetch, alertSent, alertId]);
+
+  // Simulate sending alert (only if no existing alert and not from monitoring)
+  useEffect(() => {
+    console.log('🔍 [EmergencyHelp] Second useEffect running - checking if should create new alert');
+    console.log('🔍 [EmergencyHelp] alertSent:', alertSent);
+    console.log('🔍 [EmergencyHelp] active_alert in storage:', !!sessionStorage.getItem('active_alert'));
+    console.log('🔍 [EmergencyHelp] from_monitoring in storage:', !!sessionStorage.getItem('from_monitoring'));
+    console.log('🔍 [EmergencyHelp] locationData:', locationData);
+    
+    // Don't create a new alert if one already exists or if we came from monitoring
+    if (alertSent || sessionStorage.getItem('active_alert') || sessionStorage.getItem('from_monitoring')) {
+      console.log('🔍 [EmergencyHelp] Skipping alert creation - conditions not met');
+      return;
+    }
+
+    console.log('🔍 [EmergencyHelp] All conditions met, setting up timer for alert creation');
+
     const alertTimer = setTimeout(async () => {
+      console.log('⏰ [EmergencyHelp] Timer fired - creating new alert');
       setAlertSent(true);
       
       // Create alert in database if location is available
       if (locationData) {
         try {
+          console.log('🔍 [EmergencyHelp] About to call createAlert with null sessionId');
           // Create emergency alert without a session (sessionId = null)
           const alert = await createAlert(null, locationData);
           setAlertId(alert.id);
           setAlertCreatedAt(alert.created_at);
-          console.log('✅ Emergency alert created successfully:', alert);
+          console.log('✅ [EmergencyHelp] Emergency alert created successfully:', alert);
+          
+          // Show notification
+          showNotification('Emergency alert created successfully', 'success');
           
           // Trigger immediate stats refresh to get responder count
           setTimeout(() => {
             refetch();
           }, 500);
         } catch (error) {
-          console.error('❌ Failed to create emergency alert:', error);
+          console.error('❌ [EmergencyHelp] Failed to create emergency alert:', error);
         }
+      } else {
+        console.log('🔍 [EmergencyHelp] No locationData available for alert creation');
       }
     }, 2000);
 
     return () => {
+      console.log('🔍 [EmergencyHelp] Cleaning up alert timer');
       clearTimeout(alertTimer);
     };
-  }, [locationData, createAlert, refetch]);
+  }, [locationData, createAlert, refetch, showNotification, alertSent]);
 
   // Refresh responder count more frequently for emergency alerts
   useEffect(() => {
@@ -118,6 +188,53 @@ export function EmergencyHelp({ onBack }: EmergencyHelpProps) {
       case 'disconnected':
         return <WifiOff className="w-4 h-4 text-coral-600" />;
     }
+  };
+
+  const handleEditPreciseLocation = () => {
+    if (locationData) {
+      setEditedPreciseLocation(locationData.precise);
+      setIsEditingPreciseLocation(true);
+    }
+  };
+
+  const handleSavePreciseLocation = async () => {
+    if (locationData) {
+      setLocationUpdateStatus('saving');
+      
+      try {
+        const updatedLocationData = {
+          ...locationData,
+          precise: editedPreciseLocation
+        };
+
+        // Update local state immediately for better UX
+        setLocationData(updatedLocationData);
+        setIsEditingPreciseLocation(false);
+        setLocationUpdateStatus('saved');
+        
+        console.log('✅ Location updated successfully');
+        
+        // Clear saved status after 3 seconds
+        setTimeout(() => {
+          setLocationUpdateStatus('idle');
+        }, 3000);
+        
+      } catch (error) {
+        console.error('❌ Failed to update location:', error);
+        setLocationUpdateStatus('error');
+        
+        // Clear error status after 5 seconds
+        setTimeout(() => {
+          setLocationUpdateStatus('idle');
+        }, 5000);
+      }
+    }
+  };
+
+  const handleCancelEditPreciseLocation = () => {
+    setIsEditingPreciseLocation(false);
+    setEditedPreciseLocation('');
+    setLocationUpdateStatus('idle');
   };
 
   if (!locationData && !locationError) {
@@ -306,12 +423,99 @@ export function EmergencyHelp({ onBack }: EmergencyHelpProps) {
                 <MapPin className="w-5 h-5 text-primary-600" />
                 <h3 className="font-bold font-space text-gray-900">Your Location</h3>
               </div>
-              <p className="text-sm text-gray-600 font-manrope mb-3">
-                <strong>General Area:</strong> {locationData.general}
-              </p>
-              <p className="text-sm text-gray-600 font-manrope">
-                Your precise location has been shared with committed responders to ensure they can find you quickly.
-              </p>
+              
+              <div className="space-y-4">
+                {/* General Area */}
+                <div className="bg-primary-50 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-medium font-space text-primary-900">General Area</h4>
+                    <span className="text-xs bg-primary-200 text-primary-800 px-2 py-1 rounded-full font-manrope">
+                      Public
+                    </span>
+                  </div>
+                  <p className="text-sm text-primary-800 font-manrope mb-2">
+                    {locationData.general}
+                  </p>
+                  <p className="text-xs text-primary-700 font-manrope">
+                    This approximate location is visible to all responders to help coordinate the initial response.
+                  </p>
+                </div>
+
+                {/* Precise Location */}
+                <div className="bg-coral-50 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-medium font-space text-coral-900">Precise Location</h4>
+                    <span className="text-xs bg-coral-200 text-coral-800 px-2 py-1 rounded-full font-manrope">
+                      Private
+                    </span>
+                  </div>
+                  
+                  <div>
+                    {isEditingPreciseLocation ? (
+                      <div className="space-y-3">
+                        <textarea
+                          value={editedPreciseLocation}
+                          onChange={(e) => setEditedPreciseLocation(e.target.value)}
+                          className="w-full px-3 py-2 text-sm bg-white border border-coral-300 rounded-lg font-manrope focus:outline-none focus:ring-2 focus:ring-coral-500 focus:border-transparent resize-none"
+                          rows={3}
+                          placeholder="Enter your precise location..."
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleSavePreciseLocation}
+                            disabled={locationUpdateStatus === 'saving'}
+                            className="flex items-center gap-1 px-3 py-2 bg-coral-600 hover:bg-coral-700 disabled:bg-gray-400 text-white text-sm font-manrope rounded-lg transition-colors"
+                          >
+                            <Save className="w-4 h-4" />
+                            {locationUpdateStatus === 'saving' ? 'Saving...' : 'Save'}
+                          </button>
+                          <button
+                            onClick={handleCancelEditPreciseLocation}
+                            disabled={locationUpdateStatus === 'saving'}
+                            className="flex items-center gap-1 px-3 py-2 bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 text-gray-700 text-sm font-manrope rounded-lg transition-colors"
+                          >
+                            <X className="w-4 h-4" />
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-sm text-coral-800 font-manrope mb-2 font-mono bg-white p-2 rounded border">
+                          {locationData.precise}
+                        </p>
+                        <p className="text-xs text-coral-700 font-manrope mb-3">
+                          This exact location is only shared with responders who commit to helping you.
+                        </p>
+                        <button
+                          onClick={handleEditPreciseLocation}
+                          className="flex items-center gap-2 text-sm text-coral-600 hover:text-coral-700 font-manrope"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                          Edit precise location
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Update Status */}
+                {locationUpdateStatus === 'saved' && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                    <p className="text-green-800 text-sm font-manrope">
+                      ✅ Location updated successfully
+                    </p>
+                  </div>
+                )}
+                
+                {locationUpdateStatus === 'error' && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <p className="text-red-800 text-sm font-manrope">
+                      ❌ Failed to update location. Please try again.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -328,7 +532,33 @@ export function EmergencyHelp({ onBack }: EmergencyHelpProps) {
 
           {/* Cancel Button */}
           <button
-            onClick={onBack}
+            onClick={async () => {
+              try {
+                if (alertId) {
+                  await cancelAlert(alertId);
+                  console.log('✅ Alert cancelled successfully by user');
+                  
+                  // Show notification
+                  showNotification('Alert cancelled successfully', 'success');
+                  
+                  // Brief delay to allow notification to be seen before navigating back
+                  setTimeout(() => {
+                    onBack();
+                  }, 1000);
+                } else {
+                  onBack();
+                }
+              } catch (error) {
+                console.error('❌ Failed to cancel alert:', error);
+                // Show error notification
+                showNotification('Failed to cancel alert', 'error');
+                
+                // Still navigate back even if cancellation fails
+                setTimeout(() => {
+                  onBack();
+                }, 1000);
+              }
+            }}
             className="w-full bg-gray-600 hover:bg-gray-700 text-white font-semibold font-space py-3 px-6 rounded-xl transition-colors"
           >
             I'm Safe - Cancel Alert

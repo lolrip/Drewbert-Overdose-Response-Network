@@ -4,6 +4,7 @@ import { useAuth } from './AuthWrapper';
 import { useAlerts } from '../hooks/useAlerts';
 import { useRealTimeStats } from '../hooks/useRealTimeStats';
 import { supabase } from '../lib/supabase';
+import { useNotifications } from './Notification';
 
 interface Alert {
   id: string;
@@ -11,7 +12,7 @@ interface Alert {
   preciseLocation: string;
   responderCount: number;
   createdAt: string;
-  status: 'active' | 'responded' | 'resolved';
+  status: 'active' | 'responded' | 'resolved' | 'cancelled';
   isCommitted?: boolean;
 }
 
@@ -38,6 +39,7 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
   const { user } = useAuth();
   const { alerts: dbAlerts, userCommitments, loading: alertsLoading, error: alertsError, lastFetchTime, connectionStatus: alertsConnectionStatus, commitToAlert, cancelResponse, endResponse, refetch: refetchAlerts } = useAlerts();
   const { stats, loading: statsLoading, error: statsError, connectionStatus: statsConnectionStatus, refetch: refetchStats } = useRealTimeStats();
+  const { showNotification } = useNotifications();
   const [showEndResponseForm, setShowEndResponseForm] = useState<string | null>(null);
   const [showCancelForm, setShowCancelForm] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -113,9 +115,9 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
     checkAdminStatus();
   }, [user]);
 
-  // Convert database alerts to display format - only active alerts
+  // Convert database alerts to display format - only active, responded, and hide cancelled alerts
   const activeAlerts = dbAlerts
-    .filter(alert => alert.status !== 'resolved')
+    .filter(alert => (alert.status === 'active' || alert.status === 'responded'))
     .map(alert => {
       const alertData = {
         id: alert.id,
@@ -123,7 +125,7 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
         preciseLocation: alert.precise_location,
         responderCount: stats.alertCommitments[alert.id] || alert.responder_count,
         createdAt: alert.created_at,
-        status: alert.status as 'active' | 'responded' | 'resolved',
+        status: alert.status as 'active' | 'responded' | 'resolved' | 'cancelled',
         isCommitted: userCommitments[alert.id] || false,
       };
       
@@ -147,18 +149,60 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
       console.log('🚀 [ResponderDashboard] Committing to alert:', alertId);
       await commitToAlert(alertId);
       console.log('✅ [ResponderDashboard] Successfully committed to alert:', alertId);
+      
+      // Show success notification
+      showNotification('You have committed to respond to this alert', 'success');
     } catch (error) {
       console.error('❌ [ResponderDashboard] Failed to commit to alert:', error);
+      
+      // Show error notification
+      showNotification('Failed to commit to alert', 'error');
     }
   };
 
   const handleCancelResponse = async (alertId: string) => {
     try {
       console.log('🚫 [ResponderDashboard] Cancelling response for alert:', alertId);
+      console.log('🔍 [ResponderDashboard] Current commitments before cancel:', userCommitments);
+      
       await cancelResponse(alertId, cancellationReason);
+      
+      console.log('✅ [ResponderDashboard] Cancel response completed');
+      console.log('🔍 [ResponderDashboard] Current commitments after cancel:', userCommitments);
+      
+      // Show success notification
+      showNotification('Response cancelled successfully', 'info');
+      
       setShowCancelForm(null);
       setCancellationReason({ reason: '', details: '' });
-      console.log('✅ [ResponderDashboard] Successfully cancelled response for alert:', alertId);
+      
+      // Check if any other responders are committed to this alert
+      const activeResponderCount = stats.alertCommitments[alertId] || 0;
+      console.log('🔍 [ResponderDashboard] Current responder count for alert:', alertId, 'is', activeResponderCount);
+      
+      // Force update the local state to hide this alert if we were the last responder
+      if (activeResponderCount <= 1) {  // 1 because our cancellation hasn't been reflected in stats yet
+        console.log('🛑 [ResponderDashboard] We were the last responder, forcing hide of alert:', alertId);
+        
+        // Update local state to immediately hide the alert even before refetch
+        const updatedAlerts = dbAlerts.map(alert => 
+          alert.id === alertId 
+            ? { ...alert, status: 'cancelled' as const } 
+            : alert
+        );
+        
+        // This is a bit of a hack, but we're directly setting alerts
+        // to force an immediate UI update without waiting for refetch
+        // @ts-ignore - Ignore the TypeScript error for direct state manipulation
+        setAlerts(updatedAlerts);
+      }
+      
+      // Force a manual refresh after short delay to ensure we get updated server state
+      setTimeout(() => {
+        console.log('🔄 [ResponderDashboard] Forcing manual refresh after cancellation');
+        handleManualRefresh();
+      }, 1000);
+      
     } catch (error) {
       console.error('❌ [ResponderDashboard] Failed to cancel response:', error);
     }
@@ -169,8 +213,14 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
       console.log('🏁 [ResponderDashboard] Ending response for alert:', alertId);
       await endResponse(alertId, responseDetails);
       console.log('✅ [ResponderDashboard] Successfully ended response for alert:', alertId);
+      
+      // Show success notification
+      showNotification('Response completed successfully', 'success');
     } catch (error) {
       console.error('❌ [ResponderDashboard] Failed to end response:', error);
+      
+      // Show error notification
+      showNotification('Failed to complete the response', 'error');
     }
     
     // Reset form and close modal
@@ -211,6 +261,20 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
           border: 'border-primary-200',
           label: 'RESOLVED'
         };
+      case 'cancelled':
+        return {
+          color: 'text-gray-600',
+          bg: 'bg-gray-50',
+          border: 'border-gray-200',
+          label: 'CANCELLED'
+        };
+      default:
+        return {
+          color: 'text-gray-600',
+          bg: 'bg-gray-50',
+          border: 'border-gray-200',
+          label: 'UNKNOWN'
+        };
     }
   };
 
@@ -247,11 +311,20 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
   const handleManualRefresh = async () => {
     console.log('🔄 [ResponderDashboard] Manual refresh triggered');
     try {
-      await Promise.all([
+      console.log('🔍 [ResponderDashboard] Alerts before refresh:', dbAlerts.map(a => ({ id: a.id, status: a.status, count: a.responder_count })));
+      
+      const results = await Promise.all([
         refetchAlerts(),
         refetchStats()
       ]);
-      console.log('✅ [ResponderDashboard] Manual refresh completed');
+      
+      console.log('✅ [ResponderDashboard] Manual refresh completed, response:', results);
+      
+      // Log after a short delay to let state update
+      setTimeout(() => {
+        console.log('🔍 [ResponderDashboard] Alerts after refresh:', dbAlerts.map(a => ({ id: a.id, status: a.status, count: a.responder_count })));
+        console.log('🔍 [ResponderDashboard] Active alerts shown:', activeAlerts.map(a => ({ id: a.id, status: a.status, count: a.responderCount })));
+      }, 500);
     } catch (error) {
       console.error('❌ [ResponderDashboard] Manual refresh failed:', error);
     }

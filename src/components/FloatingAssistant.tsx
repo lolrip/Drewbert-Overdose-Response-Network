@@ -1,19 +1,38 @@
-import React, { useState } from 'react';
-import { MessageCircle, X, Send, Bot } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { MessageCircle, X, Send, Bot, AlertCircle, Loader2 } from 'lucide-react';
+import { useAssistant } from '../hooks/useAssistant';
 
 export function FloatingAssistant() {
   const [isOpen, setIsOpen] = useState(false);
   const [chatMessage, setChatMessage] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  const { messages, isLoading, error, sendMessage, clearError } = useAssistant();
 
   const toggleChat = () => {
     setIsOpen(!isOpen);
+    if (error) clearError();
   };
 
-  const handleSendMessage = () => {
-    // In a real app, this would send to AI backend
-    console.log('Message sent:', chatMessage);
+  const handleSendMessage = async () => {
+    if (!chatMessage.trim() || isLoading) return;
+    
+    const messageToSend = chatMessage;
     setChatMessage('');
+    await sendMessage(messageToSend);
   };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   return (
     <>
@@ -42,34 +61,81 @@ export function FloatingAssistant() {
           {/* Chat Messages */}
           <div className="flex-1 p-4 bg-gray-50 overflow-y-auto">
             <div className="space-y-4">
-              {/* Welcome Message */}
-              <div className="flex items-start gap-3">
-                <div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Bot className="w-4 h-4 text-primary-600" />
+              {/* Welcome Message - only show if no messages */}
+              {messages.length === 0 && (
+                <div className="flex items-start gap-3">
+                  <div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <Bot className="w-4 h-4 text-primary-600" />
+                  </div>
+                  <div className="bg-white rounded-lg p-3 shadow-sm max-w-[220px]">
+                    <p className="text-sm text-gray-800 font-manrope">
+                      Hi! I'm Drewbert's AI assistant. I can help with:
+                    </p>
+                    <ul className="text-xs text-gray-600 font-manrope mt-2 space-y-1">
+                      <li>• Emergency guidance</li>
+                      <li>• Overdose prevention tips</li>
+                      <li>• How to use the app</li>
+                      <li>• Finding resources</li>
+                    </ul>
+                  </div>
                 </div>
-                <div className="bg-white rounded-lg p-3 shadow-sm max-w-[220px]">
-                  <p className="text-sm text-gray-800 font-manrope">
-                    Hi! I'm Drewbert's AI assistant. I can help with:
-                  </p>
-                  <ul className="text-xs text-gray-600 font-manrope mt-2 space-y-1">
-                    <li>• Emergency guidance</li>
-                    <li>• Overdose prevention tips</li>
-                    <li>• How to use the app</li>
-                    <li>• Finding resources</li>
-                  </ul>
-                </div>
-              </div>
+              )}
 
-              {/* Coming Soon Notice */}
-              <div className="text-center py-8">
-                <div className="inline-flex items-center gap-2 bg-accent-100 text-accent-800 px-3 py-2 rounded-full font-manrope text-sm">
-                  <Bot className="w-4 h-4" />
-                  <span>AI Chat Coming Soon</span>
+              {/* Error Message */}
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-red-700 font-manrope">{error}</p>
+                  </div>
                 </div>
-                <p className="text-xs text-gray-500 font-manrope mt-2">
-                  Real-time AI assistance will be available soon
-                </p>
-              </div>
+              )}
+
+              {/* Chat Messages */}
+              {messages.map((message) => (
+                <div key={message.id} className={`flex items-start gap-3 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    message.role === 'user' 
+                      ? 'bg-primary-600 text-white' 
+                      : 'bg-primary-100 text-primary-600'
+                  }`}>
+                    {message.role === 'user' ? (
+                      <span className="text-xs font-bold">U</span>
+                    ) : (
+                      <Bot className="w-4 h-4" />
+                    )}
+                  </div>
+                  <div className={`rounded-lg p-3 shadow-sm max-w-[220px] ${
+                    message.role === 'user' 
+                      ? 'bg-primary-600 text-white' 
+                      : 'bg-white text-gray-800'
+                  }`}>
+                    <p className="text-sm font-manrope whitespace-pre-wrap">{message.content}</p>
+                    <p className={`text-xs mt-1 font-manrope ${
+                      message.role === 'user' ? 'text-primary-100' : 'text-gray-500'
+                    }`}>
+                      {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                </div>
+              ))}
+
+              {/* Loading indicator */}
+              {isLoading && (
+                <div className="flex items-start gap-3">
+                  <div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <Bot className="w-4 h-4 text-primary-600" />
+                  </div>
+                  <div className="bg-white rounded-lg p-3 shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 text-primary-600 animate-spin" />
+                      <p className="text-sm text-gray-600 font-manrope">Thinking...</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div ref={messagesEndRef} />
             </div>
           </div>
 
@@ -81,16 +147,24 @@ export function FloatingAssistant() {
                 placeholder="Ask for help..."
                 value={chatMessage}
                 onChange={(e) => setChatMessage(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                onKeyPress={handleKeyPress}
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg font-manrope text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                disabled
+                disabled={isLoading}
               />
               <button
                 onClick={handleSendMessage}
-                disabled
-                className="px-3 py-2 bg-gray-300 text-gray-500 rounded-lg font-manrope text-sm cursor-not-allowed flex items-center justify-center"
+                disabled={isLoading || !chatMessage.trim()}
+                className={`px-3 py-2 rounded-lg font-manrope text-sm flex items-center justify-center transition-colors ${
+                  isLoading || !chatMessage.trim()
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-primary-600 text-white hover:bg-primary-700'
+                }`}
               >
-                <Send className="w-4 h-4" />
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
               </button>
             </div>
           </div>

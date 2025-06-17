@@ -53,16 +53,42 @@ export function useAssistant() {
   // Use ref to store thread ID to avoid stale closure issues
   const threadIdRef = useRef<string | null>(null);
 
+  // Get API key from multiple possible sources
+  const getApiKey = () => {
+    // Try different environment variable names that might be used in different environments
+    return import.meta.env.VITE_OPENAI_API_KEY || 
+           import.meta.env.OPENAI_API_KEY || 
+           process.env.VITE_OPENAI_API_KEY || 
+           process.env.OPENAI_API_KEY;
+  };
+
+  const getAssistantId = () => {
+    return import.meta.env.VITE_OPENAI_ASSISTANT_ID || 
+           import.meta.env.OPENAI_ASSISTANT_ID || 
+           process.env.VITE_OPENAI_ASSISTANT_ID || 
+           process.env.OPENAI_ASSISTANT_ID;
+  };
+
+  const apiKey = getApiKey();
+  const assistantId = getAssistantId();
+
+  // Validate that we have the required environment variables
+  if (!apiKey) {
+    throw new Error('OpenAI API key is missing. Please set VITE_OPENAI_API_KEY or OPENAI_API_KEY environment variable.');
+  }
+
+  if (!assistantId) {
+    throw new Error('OpenAI Assistant ID is missing. Please set VITE_OPENAI_ASSISTANT_ID or OPENAI_ASSISTANT_ID environment variable.');
+  }
+
   // Initialize OpenAI client with environment variables
   const openai = new OpenAI({
-    apiKey: import.meta.env.VITE_OPENAI_API_KEY,
+    apiKey: apiKey,
     dangerouslyAllowBrowser: true, // Required for client-side usage
     defaultHeaders: {
       'OpenAI-Beta': 'assistants=v2' // Ensure this header is set for all SDK calls
     }
   });
-
-  const assistantId = import.meta.env.VITE_OPENAI_ASSISTANT_ID;
 
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim()) return;

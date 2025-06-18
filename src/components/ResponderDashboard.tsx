@@ -412,9 +412,21 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
                 <UserMinus className="w-4 h-4" />
                 Cancel Response
               </button>
+              
+              {/* New Get Directions Button */}
+              <a
+                href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(alert.preciseLocation)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold font-space py-3 px-6 rounded-xl transition-all duration-200 flex items-center justify-center gap-2"
+              >
+                <MapPin className="w-5 h-5" />
+                Get Directions
+              </a>
+
               <button
                 onClick={() => setShowEndResponseForm(alert.id)}
-                className="flex-1 bg-coral-600 hover:bg-coral-700 text-white font-semibold font-space py-3 px-6 rounded-xl transition-colors"
+                className="bg-coral-600 hover:bg-coral-700 text-white font-semibold font-space py-3 px-6 rounded-xl transition-colors"
               >
                 End Response
               </button>

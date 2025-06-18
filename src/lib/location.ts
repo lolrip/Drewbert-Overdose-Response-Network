@@ -47,36 +47,51 @@ export async function getCurrentLocation(): Promise<Location> {
   });
 }
 
+// In src/lib/location.ts
+
+const Maps_API_KEY = import.meta.env.VITE_Maps_API_KEY;
+const Maps_BASE_URL = 'https://maps.googleapis.com/maps/api/geocode/json';
+
 export async function reverseGeocode(location: Location): Promise<GeocodeResult> {
   try {
     const response = await fetch(
-      `${GEOCODE_BASE_URL}/reverse?lat=${location.latitude}&lon=${location.longitude}&api_key=${GEOCODE_API_KEY}&format=json`
+      `${Maps_BASE_URL}?latlng=${location.latitude},${location.longitude}&key=${Maps_API_KEY}`
     );
 
     if (!response.ok) {
-      throw new Error(`Geocoding API returned ${response.status}: ${response.statusText}`);
+      throw new Error(`Google Geocoding API returned ${response.status}: ${response.statusText}`);
     }
 
     const data = await response.json();
-    
-    if (!data || typeof data !== 'object') {
-      throw new Error('Invalid response from geocoding API');
+
+    if (data.status !== 'OK' || !data.results || data.results.length === 0) {
+      throw new Error(`Geocoding API error: ${data.status} - ${data.error_message || 'No results found'}`);
     }
 
-    // Handle case where API returns an error object
-    if (data.error) {
-      throw new Error(`Geocoding API error: ${data.error}`);
-    }
+    // Google returns an array of results, the first is usually the most accurate
+    const result = data.results[0];
+    const addressComponents = result.address_components;
 
-    // Ensure we have the required structure
+    const getAddressComponent = (type: string) => {
+      return addressComponents.find((c: any) => c.types.includes(type))?.long_name || '';
+    };
+
+    // Construct a GeocodeResult compatible with the existing format
     return {
-      display_name: data.display_name || 'Unknown location',
-      address: data.address || {},
+      display_name: result.formatted_address || 'Unknown location',
+      address: {
+        road: `${getAddressComponent('street_number')} ${getAddressComponent('route')}`.trim(),
+        neighbourhood: getAddressComponent('neighborhood'),
+        city: getAddressComponent('locality'),
+        state: getAddressComponent('administrative_area_level_1'),
+        postcode: getAddressComponent('postal_code'),
+        country: getAddressComponent('country'),
+      },
     };
   } catch (error) {
-    console.error('Reverse geocoding failed:', error);
+    console.error('Reverse geocoding with Google Maps failed:', error);
     
-    // Return a fallback result instead of throwing
+    // Fallback result remains the same
     return {
       display_name: `Location at ${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`,
       address: {

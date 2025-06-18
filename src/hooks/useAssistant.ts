@@ -53,20 +53,15 @@ export function useAssistant() {
   // Use ref to store thread ID to avoid stale closure issues
   const threadIdRef = useRef<string | null>(null);
 
-  // Get API key from multiple possible sources
+  // Get API key from Vite environment variables only (browser-safe)
   const getApiKey = () => {
-    // Try different environment variable names that might be used in different environments
     return import.meta.env.VITE_OPENAI_API_KEY || 
-           import.meta.env.OPENAI_API_KEY || 
-           process.env.VITE_OPENAI_API_KEY || 
-           process.env.OPENAI_API_KEY;
+           import.meta.env.OPENAI_API_KEY;
   };
 
   const getAssistantId = () => {
     return import.meta.env.VITE_OPENAI_ASSISTANT_ID || 
-           import.meta.env.OPENAI_ASSISTANT_ID || 
-           process.env.VITE_OPENAI_ASSISTANT_ID || 
-           process.env.OPENAI_ASSISTANT_ID;
+           import.meta.env.OPENAI_ASSISTANT_ID;
   };
 
   const apiKey = getApiKey();

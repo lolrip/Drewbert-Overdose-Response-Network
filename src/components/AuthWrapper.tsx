@@ -137,7 +137,27 @@ export function AuthWrapper({ children, requireAuth = false }: AuthWrapperProps)
             </p>
           </div>
 
-          <form onSubmit={handleAuth} className="space-y-4">
+          {/* Demo Credentials Notice */}
+          <div className="bg-accent-50 border border-accent-200 rounded-lg p-4 mb-6">
+            <h3 className="font-semibold font-space text-accent-900 mb-2">Demo Accounts</h3>
+            <p className="text-sm text-accent-800 font-manrope mb-3">
+              Use these test credentials to explore the system:
+            </p>
+            <div className="space-y-2 text-sm font-mono">
+              <div className="bg-white rounded p-2 border border-accent-200">
+                <div className="text-coral-600 font-semibold">Admin Account:</div>
+                <div>admin@drewbertdemo.online</div>
+                <div>Password: admin</div>
+              </div>
+              <div className="bg-white rounded p-2 border border-accent-200">
+                <div className="text-primary-600 font-semibold">Responder Account:</div>
+                <div>responder@drewbertdemo.online</div>
+                <div>Password: responder</div>
+              </div>
+            </div>
+          </div>
+
+          <form onSubmit={handleAuth} className="space-y-6">
             <div>
               <label className="block text-sm font-medium font-space text-gray-700 mb-2">
                 Email

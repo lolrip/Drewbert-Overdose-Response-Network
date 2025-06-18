@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Heart, Shield, Users, AlertTriangle } from 'lucide-react';
 import { BoltBadge } from './BoltBadge';
 
@@ -9,8 +9,61 @@ interface LandingPageProps {
 }
 
 export function LandingPage({ onStartMonitoring, onEmergencyHelp, onViewDashboard }: LandingPageProps) {
+  const [showDemoNotice, setShowDemoNotice] = useState(true);
+
+  // Check if user has seen the demo notice before
+  useEffect(() => {
+    const hasSeenDemo = localStorage.getItem('drewbert-demo-notice-seen');
+    if (hasSeenDemo) {
+      setShowDemoNotice(false);
+    }
+  }, []);
+
+  const handleCloseDemoNotice = () => {
+    localStorage.setItem('drewbert-demo-notice-seen', 'true');
+    setShowDemoNotice(false);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50">
+      {/* Demo Notice Modal */}
+      {showDemoNotice && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-6 z-50">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-gradient-to-br from-coral-500 to-coral-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle className="w-8 h-8 text-white" />
+              </div>
+              <h2 className="text-xl font-bold font-space text-gray-900 mb-2">
+                🚀 Demo Version
+              </h2>
+              <div className="bg-gradient-to-r from-purple-500 to-blue-500 text-white text-sm font-bold py-1 px-3 rounded-full mb-4">
+                <a href="https://hackathon.dev/" target="_new">Bolt.new World's Largest Hackathon</a>
+              </div>
+            </div>
+            
+            <div className="space-y-4 text-sm text-gray-600 font-manrope">
+              <p>
+                <strong className="text-gray-900">This is a demonstration</strong> of the Drewbert community response system built for the Bolt.new hackathon.
+              </p>
+              <p>
+                <strong className="text-coral-600">Important:</strong> There is no actual volunteer response network active yet. This demo showcases the platform's capabilities and user experience.
+              </p>
+              <p>
+                Feel free to explore all features including monitoring, emergency alerts, and the responder dashboard using the test accounts provided.
+              </p>
+            </div>
+
+            <button
+              onClick={handleCloseDemoNotice}
+              className="w-full mt-6 bg-primary-600 hover:bg-primary-700 text-white font-semibold font-space py-3 px-6 rounded-xl transition-colors"
+            >
+              Got it, let's explore!
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="px-6 py-8">
         <div className="max-w-4xl mx-auto">

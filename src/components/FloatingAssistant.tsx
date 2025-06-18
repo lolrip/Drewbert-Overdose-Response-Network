@@ -46,7 +46,7 @@ export function FloatingAssistant() {
                 <Bot className="w-5 h-5 text-primary-600" />
               </div>
               <div>
-                <h3 className="font-semibold font-space text-white">Drewbert Assistant</h3>
+                <h3 className="font-semibold font-space text-white">Drewbert</h3>
                 <p className="text-xs text-primary-100 font-manrope">Here to help</p>
               </div>
             </div>

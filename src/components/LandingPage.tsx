@@ -40,7 +40,7 @@ export function LandingPage({ onStartMonitoring, onEmergencyHelp, onViewDashboar
               </h2>
               <p className="text-gray-700 font-manrope leading-relaxed max-w-2xl mx-auto">
                 Drewbert is a community-driven platform designed to help prevent overdose emergencies through 
-                real-time monitoring and rapid response coordination. Your privacy and anonymity are our top priorities.
+                real-time monitoring and rapid response coordination. <span style="font-weight:600;">Your privacy and anonymity are our top priorities.</span>
               </p>
             </div>
 

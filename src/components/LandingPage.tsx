@@ -125,6 +125,21 @@ export function LandingPage({ onStartMonitoring, onEmergencyHelp, onViewDashboar
 
           {/* Action Buttons */}
           <div className="space-y-4">
+            {/* EMERGENCY - Most prominent */}
+            <button
+              onClick={onEmergencyHelp}
+              className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold font-space py-5 px-8 rounded-xl shadow-xl border-2 border-red-400 transform transition-all duration-200 hover:scale-[1.03] active:scale-[0.97] animate-pulse-slow"
+            >
+              <div className="flex items-center justify-center gap-3">
+                <AlertTriangle className="w-7 h-7" />
+                <span className="text-xl">🚨 EMERGENCY - Help Now</span>
+              </div>
+              <p className="text-red-100 text-sm font-manrope mt-1 font-medium">
+                Immediate assistance needed
+              </p>
+            </button>
+
+            {/* PRIMARY - Standard prominence */}
             <button
               onClick={onStartMonitoring}
               className="w-full bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white font-semibold font-space py-4 px-8 rounded-xl shadow-lg transform transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
@@ -138,22 +153,10 @@ export function LandingPage({ onStartMonitoring, onEmergencyHelp, onViewDashboar
               </p>
             </button>
 
-            <button
-              onClick={onEmergencyHelp}
-              className="w-full bg-gradient-to-r from-coral-500 to-coral-600 hover:from-coral-600 hover:to-coral-700 text-white font-semibold font-space py-4 px-8 rounded-xl shadow-lg transform transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] animate-pulse-slow"
-            >
-              <div className="flex items-center justify-center gap-3">
-                <AlertTriangle className="w-6 h-6" />
-                <span className="text-lg">Help Now</span>
-              </div>
-              <p className="text-coral-100 text-sm font-manrope mt-1">
-                Emergency assistance needed immediately
-              </p>
-            </button>
-
+            {/* SECONDARY - Less prominent */}
             <button
               onClick={onViewDashboard}
-              className="w-full bg-gradient-to-r from-accent-500 to-accent-600 hover:from-accent-600 hover:to-accent-700 text-white font-semibold font-space py-3 px-8 rounded-xl shadow-lg transform transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+              className="w-full bg-white hover:bg-gray-50 border-2 border-accent-500 hover:border-accent-600 text-accent-600 hover:text-accent-700 font-semibold font-space py-3 px-8 rounded-xl shadow-sm transform transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
             >
               <div className="flex items-center justify-center gap-3">
                 <Users className="w-5 h-5" />

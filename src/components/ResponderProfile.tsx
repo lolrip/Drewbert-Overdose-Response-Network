@@ -443,7 +443,7 @@ export function ResponderProfile({ onBack, onViewAdminDashboard }: ResponderProf
                 through quick, coordinated emergency response.
               </p>
               <p className="text-xs text-gray-500 pt-2 border-t border-gray-200">
-                Version 1.0.0 • © 2024 Drewbert Community Response
+                Version 0.0.2 • © 2025 Drewbert Community Response
               </p>
             </div>
           </div>

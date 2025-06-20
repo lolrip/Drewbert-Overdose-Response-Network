@@ -94,12 +94,12 @@ export function LandingPage({ onStartMonitoring, onEmergencyHelp, onViewDashboar
               {/* Drewbert Alien Image */}
               <img
                 src="/drew_alien_transparent.png" 
+                style={{ width: '13rem' }}
                 alt="Drewbert the Alien mascot"
                 className="mx-auto mb-4 w-32 h-32 rounded-full border-4 border-primary-200 shadow-lg object-cover"
                 loading="lazy"
               />
               <p className="text-gray-700 font-manrope leading-relaxed max-w-2xl mx-auto">
-                This friendly alien was created by Drew himself to help build a safer community.<br />
                 Drewbert is a community-driven platform designed to help prevent overdose emergencies through 
                 real-time monitoring and rapid response coordination. Your privacy and anonymity are our top priorities.
               </p>

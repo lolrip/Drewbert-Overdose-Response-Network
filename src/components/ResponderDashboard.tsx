@@ -462,7 +462,7 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
                 </div>
               </div>
               <p className="text-sm text-gray-600 font-manrope">
-                Community emergency response coordination
+                Drewbert Overdose Detection & Response Network
                 {lastFetchTime && (
                   <span className="ml-2 text-xs text-gray-500">
                     • Last updated: {lastFetchTime.toLocaleTimeString()}

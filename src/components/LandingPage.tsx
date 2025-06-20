@@ -94,7 +94,7 @@ export function LandingPage({ onStartMonitoring, onEmergencyHelp, onViewDashboar
               {/* Drewbert Alien Image */}
               <img
                 src="/drew_alien_transparent.png" 
-                style={{ width: '13rem' }}
+                style={{ width: '11rem' }}
                 alt="Drewbert the Alien mascot"
                 className="mx-auto mb-4 w-32 h-32 rounded-full border-4 border-primary-200 shadow-lg object-cover"
                 loading="lazy"

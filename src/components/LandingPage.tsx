@@ -76,7 +76,7 @@ export function LandingPage({ onStartMonitoring, onEmergencyHelp, onViewDashboar
             </h1>
           </div>
           <p className="text-primary-700 font-manrope text-lg">
-            Community-driven overdose detection and response
+            Overdose Detection & Response Network
           </p>
         </div>
       </header>
@@ -89,9 +89,17 @@ export function LandingPage({ onStartMonitoring, onEmergencyHelp, onViewDashboar
           <div className="bg-white rounded-2xl shadow-lg border border-primary-100 p-8">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold font-space text-gray-900 mb-4">
-                Welcome to Drewbert
+                Meet Drewbert!
               </h2>
+              {/* Drewbert Alien Image */}
+              <img
+                src="/alien.png" // Place your image in the public directory for security & performance
+                alt="Drewbert the Alien mascot"
+                className="mx-auto mb-4 w-32 h-32 rounded-full border-4 border-primary-200 shadow-lg object-cover"
+                loading="lazy"
+              />
               <p className="text-gray-700 font-manrope leading-relaxed max-w-2xl mx-auto">
+                This friendly alien was created by Drew himself to help build a safer community.<br />
                 Drewbert is a community-driven platform designed to help prevent overdose emergencies through 
                 real-time monitoring and rapid response coordination. Your privacy and anonymity are our top priorities.
               </p>
@@ -132,7 +140,7 @@ export function LandingPage({ onStartMonitoring, onEmergencyHelp, onViewDashboar
             >
               <div className="flex items-center justify-center gap-3">
                 <AlertTriangle className="w-7 h-7" />
-                <span className="text-xl">🚨 EMERGENCY - Help Now</span>
+                <span className="text-xl">EMERGENCY - Help Now</span>
               </div>
               <p className="text-red-100 text-sm font-manrope mt-1 font-medium">
                 Immediate assistance needed

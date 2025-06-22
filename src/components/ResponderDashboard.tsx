@@ -438,33 +438,33 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 overflow-x-hidden">
       {/* Header */}
       <header className={`bg-white shadow-sm sticky top-0 z-10 transition-colors duration-300 ${newDataReceived ? 'bg-primary-50' : ''}`}>
-        <div className="px-6 py-4">
-          <div className="flex items-center gap-4 mb-4">
+        <div className="px-4 sm:px-6 py-4">
+          <div className="flex items-center gap-2 sm:gap-4 mb-4">
             <button
               onClick={onBack}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
               <ArrowLeft className="w-5 h-5 text-gray-600" />
             </button>
-            <div className="flex-1">
-              <div className="flex items-center gap-3">
-                <h1 className="text-xl font-bold font-space text-gray-900">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <h1 className="text-lg sm:text-xl font-bold font-space text-gray-900 truncate">
                   Responder Dashboard
                 </h1>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                   {getConnectionStatusIcon()}
-                  <span className="text-xs text-gray-500 font-manrope">
+                  <span className="text-xs text-gray-500 font-manrope hidden sm:inline">
                     {getConnectionStatusText()}
                   </span>
                 </div>
               </div>
-              <p className="text-sm text-gray-600 font-manrope">
+              <p className="text-sm text-gray-600 font-manrope truncate">
                 Drewbert Overdose Detection & Response Network
                 {lastFetchTime && (
-                  <span className="ml-2 text-xs text-gray-500">
+                  <span className="ml-2 text-xs text-gray-500 hidden sm:inline">
                     • Last updated: {lastFetchTime.toLocaleTimeString()}
                   </span>
                 )}
@@ -506,38 +506,38 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
           </div>
 
           {/* Real-time Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-primary-50 rounded-lg p-4 text-center">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <Users className="w-5 h-5 text-primary-600" />
-                <span className="text-2xl font-bold font-space text-primary-900">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3 md:gap-4">
+            <div className="bg-primary-50 rounded-lg p-2 sm:p-3 md:p-4 text-center">
+              <div className="flex items-center justify-center gap-1 sm:gap-2 mb-1 sm:mb-2">
+                <Users className="w-4 h-4 sm:w-5 sm:h-5 text-primary-600" />
+                <span className="text-lg sm:text-xl md:text-2xl font-bold font-space text-primary-900">
                   {stats.activeResponders}
                 </span>
               </div>
-              <p className="text-sm text-primary-700 font-manrope">Active Responders</p>
-              <p className="text-xs text-primary-600 font-manrope mt-1">Currently online</p>
+              <p className="text-xs sm:text-sm text-primary-700 font-manrope">Active Responders</p>
+              <p className="text-xs text-primary-600 font-manrope mt-0.5 sm:mt-1 hidden sm:block">Currently online</p>
             </div>
             
-            <div className="bg-accent-50 rounded-lg p-4 text-center">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <AlertCircle className="w-5 h-5 text-accent-600" />
-                <span className="text-2xl font-bold font-space text-accent-900">
+            <div className="bg-accent-50 rounded-lg p-2 sm:p-3 md:p-4 text-center">
+              <div className="flex items-center justify-center gap-1 sm:gap-2 mb-1 sm:mb-2">
+                <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-accent-600" />
+                <span className="text-lg sm:text-xl md:text-2xl font-bold font-space text-accent-900">
                   {stats.committedResponders}
                 </span>
               </div>
-              <p className="text-sm text-accent-700 font-manrope">Committed Responders</p>
-              <p className="text-xs text-accent-600 font-manrope mt-1">Currently responding</p>
+              <p className="text-xs sm:text-sm text-accent-700 font-manrope">Committed Responders</p>
+              <p className="text-xs text-accent-600 font-manrope mt-0.5 sm:mt-1 hidden sm:block">Currently responding</p>
             </div>
             
-            <div className="bg-coral-50 rounded-lg p-4 text-center">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <AlertCircle className="w-5 h-5 text-coral-600" />
-                <span className="text-2xl font-bold font-space text-coral-900">
+            <div className="bg-coral-50 rounded-lg p-2 sm:p-3 md:p-4 text-center">
+              <div className="flex items-center justify-center gap-1 sm:gap-2 mb-1 sm:mb-2">
+                <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-coral-600" />
+                <span className="text-lg sm:text-xl md:text-2xl font-bold font-space text-coral-900">
                   {activeAlerts.length}
                 </span>
               </div>
-              <p className="text-sm text-coral-700 font-manrope">Active Alerts</p>
-              <p className="text-xs text-coral-600 font-manrope mt-1">Requiring response</p>
+              <p className="text-xs sm:text-sm text-coral-700 font-manrope">Active Alerts</p>
+              <p className="text-xs text-coral-600 font-manrope mt-0.5 sm:mt-1 hidden sm:block">Requiring response</p>
             </div>
           </div>
 
@@ -555,7 +555,7 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
       </header>
 
       {/* Main Content */}
-      <main className="px-6 py-6">
+      <main className="px-4 sm:px-6 py-4 sm:py-6">
         <div className="max-w-4xl mx-auto">
           
           {alertsLoading && activeAlerts.length === 0 ? (
@@ -608,9 +608,9 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
 
       {/* Cancel Response Modal */}
       {showCancelForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-6 z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 sm:p-6 z-50">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-bold font-space text-gray-900">
                   Cancel Response
@@ -684,9 +684,9 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
 
       {/* End Response Modal */}
       {showEndResponseForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-6 z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 sm:p-6 z-50">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-bold font-space text-gray-900">
                   End Response

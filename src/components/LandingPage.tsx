@@ -25,11 +25,11 @@ export function LandingPage({ onStartMonitoring, onEmergencyHelp, onViewDashboar
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-accent-50 overflow-x-hidden">
       {/* Demo Notice Modal */}
       {showDemoNotice && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-6 z-50">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 sm:p-6 z-50">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-4 sm:p-6">
             <div className="text-center mb-6">
               <div className="w-16 h-16 bg-gradient-to-br from-coral-500 to-coral-600 rounded-full flex items-center justify-center mx-auto mb-4">
                 <AlertTriangle className="w-8 h-8 text-white" />
@@ -65,66 +65,66 @@ export function LandingPage({ onStartMonitoring, onEmergencyHelp, onViewDashboar
       )}
 
       {/* Header */}
-      <header className="px-6 py-8">
+      <header className="px-4 sm:px-6 py-6 sm:py-8">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-12 h-12 bg-gradient-to-br from-primary-600 to-primary-800 rounded-xl flex items-center justify-center">
-              <Heart className="w-6 h-6 text-white" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-primary-600 to-primary-800 rounded-xl flex items-center justify-center">
+              <Heart className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
-            <h1 className="text-3xl font-bold font-space text-primary-900">
+            <h1 className="text-2xl sm:text-3xl font-bold font-space text-primary-900">
               Drewbert
             </h1>
           </div>
-          <p className="text-primary-700 font-manrope text-lg">
+          <p className="text-primary-700 font-manrope text-base sm:text-lg">
             Overdose Detection & Response Network
           </p>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="px-6 pb-20">
+      <main className="px-4 sm:px-6 pb-16 sm:pb-20">
         <div className="max-w-4xl mx-auto space-y-8">
           
           {/* Welcome Section */}
-          <div className="bg-white rounded-2xl shadow-lg border border-primary-100 p-8">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold font-space text-gray-900 mb-4">
+          <div className="bg-white rounded-2xl shadow-lg border border-primary-100 p-4 sm:p-6 lg:p-8">
+            <div className="text-center mb-6 sm:mb-8">
+              <h2 className="text-xl sm:text-2xl font-bold font-space text-gray-900 mb-3 sm:mb-4">
                 Meet Drewbert!
               </h2>
               {/* Drewbert Alien Image */}
               <img
                 src="/drew_alien_transparent.png" 
-                style={{ width: '11rem' }}
+                style={{ width: '8rem' }}
                 alt="Drewbert the Alien mascot"
-                className="mx-auto mb-4 w-32 h-32 rounded-full border-4 border-primary-200 shadow-lg object-cover"
+                className="mx-auto mb-3 sm:mb-4 w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-primary-200 shadow-lg object-cover"
                 loading="lazy"
               />
-              <p className="text-gray-700 font-manrope leading-relaxed max-w-2xl mx-auto">
+              <p className="text-sm sm:text-base text-gray-700 font-manrope leading-relaxed max-w-2xl mx-auto px-2">
                 Drewbert is a community-driven platform designed to help prevent overdose emergencies through 
                 real-time monitoring and rapid response coordination. Your privacy and anonymity are our top priorities.
               </p>
             </div>
 
             {/* Feature Cards */}
-            <div className="grid md:grid-cols-3 gap-6 mb-8">
-              <div className="text-center p-6 bg-primary-50 rounded-xl">
-                <Shield className="w-8 h-8 text-primary-600 mx-auto mb-3" />
-                <h3 className="font-semibold font-space text-primary-900 mb-2">Anonymous & Private</h3>
-                <p className="text-sm text-primary-700 font-manrope">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
+              <div className="text-center p-3 sm:p-4 lg:p-6 bg-primary-50 rounded-xl">
+                <Shield className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-primary-600 mx-auto mb-2 sm:mb-3" />
+                <h3 className="font-semibold font-space text-primary-900 mb-1 sm:mb-2 text-sm sm:text-base">Anonymous & Private</h3>
+                <p className="text-xs sm:text-sm text-primary-700 font-manrope leading-snug">
                   Your identity remains protected with our two-tier location system
                 </p>
               </div>
-              <div className="text-center p-6 bg-accent-50 rounded-xl">
-                <Users className="w-8 h-8 text-accent-600 mx-auto mb-3" />
-                <h3 className="font-semibold font-space text-gray-900 mb-2">Community Response</h3>
-                <p className="text-sm text-gray-700 font-manrope">
+              <div className="text-center p-3 sm:p-4 lg:p-6 bg-accent-50 rounded-xl">
+                <Users className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-accent-600 mx-auto mb-2 sm:mb-3" />
+                <h3 className="font-semibold font-space text-gray-900 mb-1 sm:mb-2 text-sm sm:text-base">Community Response</h3>
+                <p className="text-xs sm:text-sm text-gray-700 font-manrope leading-snug">
                   Trained community responders ready to help in emergencies
                 </p>
               </div>
-              <div className="text-center p-6 bg-coral-50 rounded-xl">
-                <AlertTriangle className="w-8 h-8 text-coral-600 mx-auto mb-3" />
-                <h3 className="font-semibold font-space text-gray-900 mb-2">Real-time Monitoring</h3>
-                <p className="text-sm text-gray-700 font-manrope">
+              <div className="text-center p-3 sm:p-4 lg:p-6 bg-coral-50 rounded-xl sm:col-span-2 lg:col-span-1">
+                <AlertTriangle className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-coral-600 mx-auto mb-2 sm:mb-3" />
+                <h3 className="font-semibold font-space text-gray-900 mb-1 sm:mb-2 text-sm sm:text-base">Real-time Monitoring</h3>
+                <p className="text-xs sm:text-sm text-gray-700 font-manrope leading-snug">
                   60-second check-ins with automatic emergency dispatch
                 </p>
               </div>
@@ -132,17 +132,17 @@ export function LandingPage({ onStartMonitoring, onEmergencyHelp, onViewDashboar
           </div>
 
           {/* Action Buttons */}
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {/* EMERGENCY - Most prominent */}
             <button
               onClick={onEmergencyHelp}
-              className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold font-space py-5 px-8 rounded-xl shadow-xl border-2 border-red-400 transform transition-all duration-200 hover:scale-[1.03] active:scale-[0.97] animate-pulse-slow"
+              className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold font-space py-4 sm:py-5 px-4 sm:px-8 rounded-xl shadow-xl border-2 border-red-400 transform transition-all duration-200 hover:scale-[1.03] active:scale-[0.97] animate-pulse-slow"
             >
-              <div className="flex items-center justify-center gap-3">
-                <AlertTriangle className="w-7 h-7" />
-                <span className="text-xl">EMERGENCY - Help Now</span>
+              <div className="flex items-center justify-center gap-2 sm:gap-3">
+                <AlertTriangle className="w-6 h-6 sm:w-7 sm:h-7" />
+                <span className="text-lg sm:text-xl">EMERGENCY - Help Now</span>
               </div>
-              <p className="text-red-100 text-sm font-manrope mt-1 font-medium">
+              <p className="text-red-100 text-xs sm:text-sm font-manrope mt-1 font-medium">
                 Immediate assistance needed
               </p>
             </button>
@@ -150,13 +150,13 @@ export function LandingPage({ onStartMonitoring, onEmergencyHelp, onViewDashboar
             {/* PRIMARY - Standard prominence */}
             <button
               onClick={onStartMonitoring}
-              className="w-full bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white font-semibold font-space py-4 px-8 rounded-xl shadow-lg transform transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+              className="w-full bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white font-semibold font-space py-3 sm:py-4 px-4 sm:px-8 rounded-xl shadow-lg transform transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
             >
-              <div className="flex items-center justify-center gap-3">
-                <Shield className="w-6 h-6" />
-                <span className="text-lg">Start Monitoring</span>
+              <div className="flex items-center justify-center gap-2 sm:gap-3">
+                <Shield className="w-5 h-5 sm:w-6 sm:h-6" />
+                <span className="text-base sm:text-lg">Start Monitoring</span>
               </div>
-              <p className="text-primary-100 text-sm font-manrope mt-1">
+              <p className="text-primary-100 text-xs sm:text-sm font-manrope mt-1">
                 Begin 60-second safety check-ins
               </p>
             </button>
@@ -164,24 +164,24 @@ export function LandingPage({ onStartMonitoring, onEmergencyHelp, onViewDashboar
             {/* SECONDARY - Less prominent */}
             <button
               onClick={onViewDashboard}
-              className="w-full bg-white hover:bg-gray-50 border-2 border-accent-500 hover:border-accent-600 text-accent-600 hover:text-accent-700 font-semibold font-space py-3 px-8 rounded-xl shadow-sm transform transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
+              className="w-full bg-white hover:bg-gray-50 border-2 border-accent-500 hover:border-accent-600 text-accent-600 hover:text-accent-700 font-semibold font-space py-2 sm:py-3 px-4 sm:px-8 rounded-xl shadow-sm transform transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
             >
-              <div className="flex items-center justify-center gap-3">
-                <Users className="w-5 h-5" />
-                <span>Responder Dashboard</span>
+              <div className="flex items-center justify-center gap-2 sm:gap-3">
+                <Users className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="text-sm sm:text-base">Responder Dashboard</span>
               </div>
             </button>
           </div>
 
           {/* Footer */}
-          <div className="text-center pt-8 border-t border-primary-100">
-            <p className="text-sm text-gray-600 font-manrope mb-4">
+          <div className="text-center pt-6 sm:pt-8 border-t border-primary-100">
+            <p className="text-xs sm:text-sm text-gray-600 font-manrope mb-3 sm:mb-4 px-4">
               Need help? Click the chat assistant in the bottom right corner.
             </p>
-            <p className="text-sm text-gray-600 font-manrope">
+            <p className="text-xs sm:text-sm text-gray-600 font-manrope mb-2 px-4">
               If you're experiencing a medical emergency, call 911 immediately.
             </p>
-            <p className="text-xs text-gray-500 font-manrope mt-2">
+            <p className="text-xs text-gray-500 font-manrope px-4">
               Drewbert is a community support tool and should not replace professional medical care.
             </p>
           </div>

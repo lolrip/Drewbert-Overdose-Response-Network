@@ -439,48 +439,77 @@ export function useAlerts() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Must be authenticated');
 
-      console.log('🏁 [useAlerts] Ending response for alert:', alertId);
+      console.log('🏁 [useAlerts] Ending response for alert:', alertId, 'with details:', details);
 
-      // Update the response status to completed with details
-      const { error: responseError } = await supabase
-        .from('responses')
-        .update({ 
-          status: 'completed',
-          ambulance_called: details.ambulanceCalled,
-          person_okay: details.personOkay,
-          naloxone_used: details.naloxoneUsed,
-          additional_notes: details.additionalNotes
-        })
-        .eq('alert_id', alertId)
-        .eq('responder_id', user.id);
+      // Prevent multiple simultaneous calls using a simple debounce check
+      const callKey = `end_response_${alertId}_${user.id}`;
+      if (window._activeEndResponseCalls?.has(callKey)) {
+        console.log('⏰ [useAlerts] End response already in progress for alert:', alertId);
+        return;
+      }
+      
+      // Track active calls to prevent duplicates
+      if (!window._activeEndResponseCalls) window._activeEndResponseCalls = new Set();
+      window._activeEndResponseCalls.add(callKey);
 
-      if (responseError) throw responseError;
+      try {
+        // Update the response status to completed with details
+        const { error: responseError } = await supabase
+          .from('responses')
+          .update({ 
+            status: 'completed',
+            ambulance_called: details.ambulanceCalled,
+            person_okay: details.personOkay,
+            naloxone_used: details.naloxoneUsed,
+            additional_notes: details.additionalNotes,
+            updated_at: new Date().toISOString()
+          })
+          .eq('alert_id', alertId)
+          .eq('responder_id', user.id);
 
-      // Update alert status to resolved
-      const { error: alertError } = await supabase
-        .from('alerts')
-        .update({ status: 'resolved' })
-        .eq('id', alertId);
+        if (responseError) {
+          console.error('❌ [useAlerts] Failed to update response:', responseError);
+          throw responseError;
+        }
 
-      if (alertError) throw alertError;
+        // Update alert status to resolved
+        const { error: alertError } = await supabase
+          .from('alerts')
+          .update({ 
+            status: 'resolved',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', alertId);
 
-      console.log('✅ [useAlerts] Response ended successfully');
+        if (alertError) {
+          console.error('❌ [useAlerts] Failed to update alert status:', alertError);
+          throw alertError;
+        }
 
-      // Update local state
-      setUserCommitments(prev => {
-        const updated = { ...prev };
-        delete updated[alertId];
-        return updated;
-      });
+        console.log('✅ [useAlerts] Response ended successfully');
 
-      // Trigger debounced refresh
-      debouncedFetchAlerts();
+        // Update local state immediately for better UX
+        setUserCommitments(prev => {
+          const updated = { ...prev };
+          delete updated[alertId];
+          return updated;
+        });
+
+        // Force immediate refresh rather than debounced
+        setTimeout(() => {
+          fetchAlerts();
+        }, 100);
+
+      } finally {
+        // Always clean up the active call tracker
+        window._activeEndResponseCalls?.delete(callKey);
+      }
 
     } catch (err) {
       console.error('❌ [useAlerts] Failed to end response:', err);
       throw err;
     }
-  }, [debouncedFetchAlerts]);
+  }, [fetchAlerts]);
 
   // Cleanup function
   const cleanup = useCallback(() => {

@@ -145,14 +145,8 @@ export function AuthWrapper({ children, requireAuth = false }: AuthWrapperProps)
             </p>
             <div className="space-y-2 text-sm font-mono">
               <div className="bg-white rounded p-2 border border-accent-200">
-                <div className="text-coral-600 font-semibold">Admin Account:</div>
-                <div>admin@drewbertdemo.online</div>
-                <div>Password: admin</div>
-              </div>
-              <div className="bg-white rounded p-2 border border-accent-200">
-                <div className="text-primary-600 font-semibold">Responder Account:</div>
-                <div>responder@drewbertdemo.online</div>
-                <div>Password: responder</div>
+                <div>demo@drewbertdemo.online </div>
+                <div>Password: demo</div>
               </div>
             </div>
           </div>
@@ -203,10 +197,16 @@ export function AuthWrapper({ children, requireAuth = false }: AuthWrapperProps)
 
             <button
               type="button"
-              onClick={() => setIsSignUp(!isSignUp)}
-              className="w-full text-primary-600 hover:text-primary-700 font-manrope text-sm"
+              disabled={!isSignUp}
+              className={`w-full font-manrope text-sm ${
+                isSignUp 
+                  ? 'text-primary-600 hover:text-primary-700 cursor-pointer' 
+                  : 'text-gray-400 cursor-not-allowed'
+              }`}
+              onClick={() => isSignUp && setIsSignUp(false)}
+              title={!isSignUp ? 'New registrations are currently disabled' : ''}
             >
-              {isSignUp ? 'Already have an account? Sign in' : 'Need an account? Sign up'}
+              {isSignUp ? 'Already have an account? Sign in' : 'Need an account? (New Registrations Disabled)'}
             </button>
           </form>
         </div>

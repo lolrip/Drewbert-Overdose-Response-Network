@@ -86,14 +86,7 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
             </div>
             
             <div className="flex gap-2">
-              <button
-                onClick={refetch}
-                disabled={loading}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
-              >
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                <span className="text-sm font-manrope">Refresh</span>
-              </button>
+              {/* Refresh button removed - admin reports auto-refresh and manual refresh is redundant */}
               <button
                 onClick={handleDownloadReport}
                 disabled={!stats}

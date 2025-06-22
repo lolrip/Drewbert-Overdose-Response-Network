@@ -55,6 +55,7 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
     reason: '',
     details: '',
   });
+  const [isEndingResponse, setIsEndingResponse] = useState<string | null>(null);
 
   console.log('📊 [ResponderDashboard] DB Alerts count:', dbAlerts.length);
   console.log('📊 [ResponderDashboard] Alert commitments count:', Object.keys(stats.alertCommitments).length);
@@ -209,28 +210,36 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
   };
 
   const handleEndResponse = async (alertId: string) => {
+    // Prevent multiple clicks
+    if (isEndingResponse === alertId) {
+      console.log('⏰ [ResponderDashboard] End response already in progress');
+      return;
+    }
+
     try {
+      setIsEndingResponse(alertId);
       console.log('🏁 [ResponderDashboard] Ending response for alert:', alertId);
-      await endResponse(alertId, responseDetails);
-      console.log('✅ [ResponderDashboard] Successfully ended response for alert:', alertId);
       
-      // Show success notification
+      await endResponse(alertId, responseDetails);
+      
+      console.log('✅ [ResponderDashboard] Successfully ended response for alert:', alertId);
       showNotification('Response completed successfully', 'success');
+      
+      // Reset form and close modal
+      setShowEndResponseForm(null);
+      setResponseDetails({
+        ambulanceCalled: false,
+        personOkay: false,
+        naloxoneUsed: false,
+        additionalNotes: '',
+      });
+      
     } catch (error) {
       console.error('❌ [ResponderDashboard] Failed to end response:', error);
-      
-      // Show error notification
       showNotification('Failed to complete the response', 'error');
+    } finally {
+      setIsEndingResponse(null);
     }
-    
-    // Reset form and close modal
-    setShowEndResponseForm(null);
-    setResponseDetails({
-      ambulanceCalled: false,
-      personOkay: false,
-      naloxoneUsed: false,
-      additionalNotes: '',
-    });
   };
 
   const formatTriggeredTime = (createdAt: string) => {
@@ -393,11 +402,11 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
         </div>
 
         {/* Actions */}
-        <div className="flex gap-3">
+        <div className="space-y-3">
           {!alert.isCommitted && alert.status === 'active' && (
             <button
               onClick={() => handleCommitToResponse(alert.id)}
-              className="flex-1 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white font-semibold font-space py-3 px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+              className="w-full bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white font-semibold font-space py-3 px-4 sm:px-6 rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
             >
               Commit to Respond
             </button>
@@ -405,31 +414,34 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
 
           {alert.isCommitted && alert.status !== 'resolved' && (
             <>
-              <button
-                onClick={() => setShowCancelForm(alert.id)}
-                className="flex items-center gap-2 px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white font-semibold font-space rounded-xl transition-colors"
-              >
-                <UserMinus className="w-4 h-4" />
-                Cancel Response
-              </button>
-              
-              {/* New Get Directions Button */}
+              {/* Primary action - Get Directions (most prominent) */}
               <a
                 href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(alert.preciseLocation)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold font-space py-3 px-6 rounded-xl transition-all duration-200 flex items-center justify-center gap-2"
+                className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold font-space py-3 px-4 sm:px-6 rounded-xl transition-all duration-200 flex items-center justify-center gap-2"
               >
-                <MapPin className="w-5 h-5" />
-                Get Directions
+                <MapPin className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span>Get Directions</span>
               </a>
 
-              <button
-                onClick={() => setShowEndResponseForm(alert.id)}
-                className="bg-coral-600 hover:bg-coral-700 text-white font-semibold font-space py-3 px-6 rounded-xl transition-colors"
-              >
-                End Response
-              </button>
+              {/* Secondary actions - side by side on larger screens, stacked on mobile */}
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                <button
+                  onClick={() => setShowCancelForm(alert.id)}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 sm:px-4 py-2 sm:py-3 bg-gray-600 hover:bg-gray-700 text-white font-semibold font-space rounded-xl transition-colors"
+                >
+                  <UserMinus className="w-4 h-4" />
+                  <span className="text-sm sm:text-base">Cancel Response</span>
+                </button>
+
+                <button
+                  onClick={() => setShowEndResponseForm(alert.id)}
+                  className="flex-1 bg-coral-600 hover:bg-coral-700 text-white font-semibold font-space py-2 sm:py-3 px-3 sm:px-4 rounded-xl transition-colors text-sm sm:text-base"
+                >
+                  End Response
+                </button>
+              </div>
             </>
           )}
         </div>
@@ -442,115 +454,122 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
       {/* Header */}
       <header className={`bg-white shadow-sm sticky top-0 z-10 transition-colors duration-300 ${newDataReceived ? 'bg-primary-50' : ''}`}>
         <div className="px-4 sm:px-6 py-4">
-          <div className="flex items-center gap-2 sm:gap-4 mb-4">
-            <button
-              onClick={onBack}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5 text-gray-600" />
-            </button>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 sm:gap-3">
+          {/* Top Row - Title and Actions */}
+          <div className="flex items-center justify-between mb-4">
+            {/* Left Side - Back Button and Title */}
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <button
+                onClick={onBack}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
+              >
+                <ArrowLeft className="w-5 h-5 text-gray-600" />
+              </button>
+              <div className="min-w-0">
                 <h1 className="text-lg sm:text-xl font-bold font-space text-gray-900 truncate">
                   Responder Dashboard
                 </h1>
-                <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-                  {getConnectionStatusIcon()}
-                  <span className="text-xs text-gray-500 font-manrope hidden sm:inline">
-                    {getConnectionStatusText()}
+                <p className="text-sm text-gray-600 font-manrope truncate">
+                  Drewbert Overdose Detection & Response Network
+                </p>
+              </div>
+            </div>
+
+            {/* Right Side - Status and Actions */}
+            <div className="flex items-center gap-3 flex-shrink-0">
+              {/* Connection Status */}
+              <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
+                {getConnectionStatusIcon()}
+                <span className="text-xs font-medium text-gray-600 hidden sm:inline">
+                  {getConnectionStatusText()}
+                </span>
+              </div>
+
+              {/* Refresh Button */}
+              <button
+                onClick={handleManualRefresh}
+                disabled={alertsLoading || statsLoading}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Refresh data"
+              >
+                <RefreshCw className={`w-5 h-5 text-gray-600 ${(alertsLoading || statsLoading) ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+          </div>
+
+          {/* Bottom Row - Admin/Profile Actions and Stats */}
+          <div className="space-y-4">
+            {/* Admin/Profile Buttons Row */}
+            <div className="flex items-center justify-between">
+              {/* Last Updated Info */}
+              {lastFetchTime && (
+                <div className="text-xs text-gray-500 font-manrope">
+                  Last updated: {lastFetchTime.toLocaleTimeString()}
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2">
+                {/* Profile Button with Admin Crown - single access point for both regular users and admins */}
+                <button
+                  onClick={onViewProfile}
+                  className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors relative"
+                >
+                  <Settings className="w-4 h-4" />
+                  <span className="text-sm font-manrope">Profile</span>
+                  {!adminLoading && isAdmin && (
+                    <Crown className="w-4 h-4 text-yellow-300" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Real-time Stats */}
+            <div className="grid grid-cols-3 gap-2 sm:gap-3 md:gap-4">
+              <div className="bg-primary-50 rounded-lg p-2 sm:p-3 md:p-4 text-center">
+                <div className="flex items-center justify-center gap-1 sm:gap-2 mb-1 sm:mb-2">
+                  <Users className="w-4 h-4 sm:w-5 sm:h-5 text-primary-600" />
+                  <span className="text-lg sm:text-xl md:text-2xl font-bold font-space text-primary-900">
+                    {stats.activeResponders}
                   </span>
                 </div>
+                <p className="text-xs sm:text-sm text-primary-700 font-manrope">Active Responders</p>
+                <p className="text-xs text-primary-600 font-manrope mt-0.5 sm:mt-1 hidden sm:block">Currently online</p>
               </div>
-              <p className="text-sm text-gray-600 font-manrope truncate">
-                Drewbert Overdose Detection & Response Network
-                {lastFetchTime && (
-                  <span className="ml-2 text-xs text-gray-500 hidden sm:inline">
-                    • Last updated: {lastFetchTime.toLocaleTimeString()}
+              
+              <div className="bg-accent-50 rounded-lg p-2 sm:p-3 md:p-4 text-center">
+                <div className="flex items-center justify-center gap-1 sm:gap-2 mb-1 sm:mb-2">
+                  <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-accent-600" />
+                  <span className="text-lg sm:text-xl md:text-2xl font-bold font-space text-accent-900">
+                    {stats.committedResponders}
                   </span>
-                )}
-              </p>
+                </div>
+                <p className="text-xs sm:text-sm text-accent-700 font-manrope">Committed Responders</p>
+                <p className="text-xs text-accent-600 font-manrope mt-0.5 sm:mt-1 hidden sm:block">Currently responding</p>
+              </div>
+              
+              <div className="bg-coral-50 rounded-lg p-2 sm:p-3 md:p-4 text-center">
+                <div className="flex items-center justify-center gap-1 sm:gap-2 mb-1 sm:mb-2">
+                  <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-coral-600" />
+                  <span className="text-lg sm:text-xl md:text-2xl font-bold font-space text-coral-900">
+                    {activeAlerts.length}
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm text-coral-700 font-manrope">Active Alerts</p>
+                <p className="text-xs text-coral-600 font-manrope mt-0.5 sm:mt-1 hidden sm:block">Requiring response</p>
+              </div>
             </div>
-            
-            {/* Refresh Button */}
-            <button
-              onClick={handleManualRefresh}
-              disabled={alertsLoading || statsLoading}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              title="Refresh data"
-            >
-              <RefreshCw className={`w-5 h-5 text-gray-600 ${(alertsLoading || statsLoading) ? 'animate-spin' : ''}`} />
-            </button>
-            
-            {/* Admin Dashboard Button - Right in Header for Admins */}
-            {!adminLoading && isAdmin && (
-              <button
-                onClick={onViewProfile}
-                className="flex items-center gap-2 px-6 py-3 bg-coral-600 hover:bg-coral-700 text-white rounded-xl transition-colors shadow-lg animate-pulse-slow mr-4"
-              >
-                <BarChart3 className="w-5 h-5" />
-                <span className="font-semibold font-space">Admin Panel</span>
-              </button>
+
+            {/* Connection Status Error */}
+            {(alertsError || statsError) && (
+              <div className="bg-coral-50 border border-coral-200 rounded-lg p-3">
+                <p className="text-coral-800 text-sm font-manrope">
+                  {alertsError && `Alerts Error: ${alertsError}`}
+                  {alertsError && statsError && ' | '}
+                  {statsError && `Stats Error: ${statsError}`}
+                </p>
+              </div>
             )}
-            
-            {/* Profile Button with Admin Crown */}
-            <button
-              onClick={onViewProfile}
-              className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors relative"
-            >
-              <Settings className="w-4 h-4" />
-              <span className="text-sm font-manrope">Profile</span>
-              {!adminLoading && isAdmin && (
-                <Crown className="w-4 h-4 text-yellow-300 ml-1" />
-              )}
-            </button>
           </div>
-
-          {/* Real-time Stats */}
-          <div className="grid grid-cols-3 gap-2 sm:gap-3 md:gap-4">
-            <div className="bg-primary-50 rounded-lg p-2 sm:p-3 md:p-4 text-center">
-              <div className="flex items-center justify-center gap-1 sm:gap-2 mb-1 sm:mb-2">
-                <Users className="w-4 h-4 sm:w-5 sm:h-5 text-primary-600" />
-                <span className="text-lg sm:text-xl md:text-2xl font-bold font-space text-primary-900">
-                  {stats.activeResponders}
-                </span>
-              </div>
-              <p className="text-xs sm:text-sm text-primary-700 font-manrope">Active Responders</p>
-              <p className="text-xs text-primary-600 font-manrope mt-0.5 sm:mt-1 hidden sm:block">Currently online</p>
-            </div>
-            
-            <div className="bg-accent-50 rounded-lg p-2 sm:p-3 md:p-4 text-center">
-              <div className="flex items-center justify-center gap-1 sm:gap-2 mb-1 sm:mb-2">
-                <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-accent-600" />
-                <span className="text-lg sm:text-xl md:text-2xl font-bold font-space text-accent-900">
-                  {stats.committedResponders}
-                </span>
-              </div>
-              <p className="text-xs sm:text-sm text-accent-700 font-manrope">Committed Responders</p>
-              <p className="text-xs text-accent-600 font-manrope mt-0.5 sm:mt-1 hidden sm:block">Currently responding</p>
-            </div>
-            
-            <div className="bg-coral-50 rounded-lg p-2 sm:p-3 md:p-4 text-center">
-              <div className="flex items-center justify-center gap-1 sm:gap-2 mb-1 sm:mb-2">
-                <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-coral-600" />
-                <span className="text-lg sm:text-xl md:text-2xl font-bold font-space text-coral-900">
-                  {activeAlerts.length}
-                </span>
-              </div>
-              <p className="text-xs sm:text-sm text-coral-700 font-manrope">Active Alerts</p>
-              <p className="text-xs text-coral-600 font-manrope mt-0.5 sm:mt-1 hidden sm:block">Requiring response</p>
-            </div>
-          </div>
-
-          {/* Connection Status Error */}
-          {(alertsError || statsError) && (
-            <div className="mt-4 bg-coral-50 border border-coral-200 rounded-lg p-3">
-              <p className="text-coral-800 text-sm font-manrope">
-                {alertsError && `Alerts Error: ${alertsError}`}
-                {alertsError && statsError && ' | '}
-                {statsError && `Stats Error: ${statsError}`}
-              </p>
-            </div>
-          )}
         </div>
       </header>
 
@@ -773,9 +792,14 @@ export function ResponderDashboard({ onBack, onViewProfile }: ResponderDashboard
                   </button>
                   <button
                     onClick={() => handleEndResponse(showEndResponseForm)}
-                    className="flex-1 bg-primary-600 hover:bg-primary-700 text-white font-semibold font-space py-3 px-4 rounded-xl transition-colors"
+                    disabled={isEndingResponse === showEndResponseForm}
+                    className={`flex-1 ${
+                      isEndingResponse === showEndResponseForm 
+                        ? 'bg-gray-400 cursor-not-allowed' 
+                        : 'bg-primary-600 hover:bg-primary-700'
+                    } text-white font-semibold font-space py-3 px-4 rounded-xl transition-colors`}
                   >
-                    Submit & End
+                    {isEndingResponse === showEndResponseForm ? 'Submitting...' : 'Submit & End'}
                   </button>
                 </div>
               </div>

@@ -50,6 +50,7 @@ export async function getCurrentLocation(): Promise<Location> {
 // In src/lib/location.ts
 
 const Maps_API_KEY = import.meta.env.VITE_Maps_API_KEY;
+console.log(Maps_API_KEY)
 const Maps_BASE_URL = 'https://maps.googleapis.com/maps/api/geocode/json';
 
 export async function reverseGeocode(location: Location): Promise<GeocodeResult> {

@@ -482,7 +482,7 @@ export function MonitoringView({ onBack, onAlert }: MonitoringViewProps) {
               </ul>
             </div>
 
-            {/* Your Location - Moved above Privacy */}
+            {/* Your Location */}
             {locationData && (
               <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                 <div className="flex items-center gap-3 mb-4">
@@ -568,7 +568,7 @@ export function MonitoringView({ onBack, onAlert }: MonitoringViewProps) {
               </div>
             )}
 
-            {/* Your Privacy - Moved below Location */}
+            {/* Your Privacy*/}
             <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
               <h3 className="font-semibold font-space text-gray-900 mb-2">Your Privacy</h3>
               <div className="space-y-2 text-sm text-gray-600 font-manrope">

@@ -86,7 +86,6 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
             </div>
             
             <div className="flex gap-2">
-              {/* Refresh button removed - admin reports auto-refresh and manual refresh is redundant */}
               <button
                 onClick={handleDownloadReport}
                 disabled={!stats}

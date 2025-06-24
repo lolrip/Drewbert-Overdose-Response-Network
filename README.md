@@ -1,6 +1,7 @@
 # Drewbert - Community Overdose Response
 
 [![Netlify Status](https://api.netlify.com/api/v1/badges/b48e1c8e-7556-4100-b82c-d07e5ddc5b0a/deploy-status)](https://app.netlify.com/projects/effervescent-sunshine-219a54/deploys)
+
 [!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/drewbertapp)
 
 A community-driven overdose detection and response system built for [Bolt's World's Largest Hackathon](https://worldslargesthackathon.devpost.com). This Progressive Web App (PWA) connects people in crisis with nearby trained responders and emergency services.
